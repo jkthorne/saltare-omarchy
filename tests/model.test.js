@@ -422,3 +422,15 @@ test("every demo state renders as bin/demo-states advertises it", () => {
   }
   fs.rmSync(tmp, { force: true })
 })
+
+test("the bar widget root has an implicit size, or the bar gives it no room", () => {
+  // Found by looking at a bar that had no widget on it. The component loaded,
+  // the layout listed it, the log was clean — and the root Item was 0x0, so
+  // the BarIconButton anchored to fill it filled nothing. Nothing errors; it
+  // is simply absent, which is the hardest kind of broken to notice.
+  const source = qml("Panel.qml")
+  assert.match(source, /implicitWidth:\s*button\./)
+  assert.match(source, /implicitHeight:\s*button\./)
+  // And it must collapse when hidden, or showWhenIdle:false leaves a gap.
+  assert.match(source, /implicitWidth:\s*button\.visible\s*\?/)
+})

@@ -17,6 +17,14 @@ Panel {
   moduleName: "saltare.workspace"
   ipcTarget: "saltare"
 
+  // The bar allocates a slot from the widget root's implicit size. Without
+  // these the root is 0x0, the BarIconButton that anchors.fill's it has nothing
+  // to fill, and the widget loads perfectly and draws nothing — no error, no
+  // warning, just an empty space where it should be. Collapsing to zero when
+  // the button is hidden is what keeps `showWhenIdle: false` from leaving a gap.
+  implicitWidth: button.visible ? button.implicitWidth : 0
+  implicitHeight: button.visible ? button.implicitHeight : 0
+
   readonly property var view: watch.view
   readonly property var rows: watch.rows
 
