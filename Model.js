@@ -85,6 +85,11 @@ function state(snapshot, nowMs, settings, salPresent) {
   if (!loaded) return "signin"
   if (doc.state === "logged-out") return "signin"
   if (isStale(doc, nowMs, settings)) return "stopped"
+  // A server that answered and refused is not an outage. Saying "offline"
+  // there sends someone to check a connection that was never the problem —
+  // which is exactly what the first live run of the daemon did, against a
+  // workspace that had simply hit its monthly request cap.
+  if (doc.state === "blocked") return "blocked"
   if (doc.state === "unreachable" || doc.live === false) return "offline"
   return "ok"
 }
@@ -124,6 +129,9 @@ function fixFor(name) {
     }
   case "offline":
     return { label: "Retry now", run: "sal watch --once", hint: "" }
+  case "blocked":
+    // No retry and no re-login fixes this, so neither is offered.
+    return { label: "Check the session", run: "omarchy-launch-tui sal doctor", hint: "" }
   case "unsupported":
     return {
       label: "Update the plugin",
@@ -148,6 +156,10 @@ function detailFor(name, doc, nowMs) {
   case "offline":
     var where = doc && doc.server ? doc.server : "the server"
     return "Can't reach " + where + " — showing the last known state, " + agoLabel(doc, nowMs) + "."
+  case "blocked":
+    // The server's own sentence. It is the only thing here that says what to
+    // do about it, and inventing a paraphrase would lose that.
+    return (doc && doc.error) ? String(doc.error) : "The server refused the request."
   case "unsupported":
     return "This state file was written by a newer sal than this plugin understands."
   default:
@@ -177,9 +189,9 @@ function view(snapshot, nowMs, settings, salPresent) {
     // Stale counts are shown struck through rather than blanked: a bar that
     // drops to zero when its feed dies has told you something false.
     stale: name === "stopped",
-    dim: name !== "ok" && name !== "offline",
+    dim: name !== "ok" && name !== "offline" && name !== "blocked",
     badge: badge(totals.unread),
-    urgent: number(totals.mentions, 0) > 0 && (name === "ok" || name === "offline"),
+    urgent: number(totals.mentions, 0) > 0 && (name === "ok" || name === "offline" || name === "blocked"),
     workspace: (usable && doc.workspace && doc.workspace.name) || "Saltare",
     server: (doc && doc.server) || "",
     detail: detailFor(name, doc, nowMs),

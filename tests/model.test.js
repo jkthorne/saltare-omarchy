@@ -352,3 +352,28 @@ test("the manifest declares what the shell needs and what the settings pane show
     assert.ok(keys.includes(key), "no settings entry for " + key)
   }
 })
+
+test("a server that answered and refused is blocked, not offline", () => {
+  // The first live run of the daemon hit a workspace at its monthly request
+  // cap. The connection was perfect; the widget would have blamed it.
+  const refused = Model.parse(JSON.stringify(Object.assign({}, doc, {
+    state: "blocked",
+    live: false,
+    error: "Monthly API request limit reached (0). Upgrade your plan for more requests."
+  })))
+  const view = Model.view(refused, publishedAt, settings, true)
+
+  assert.equal(view.state, "blocked")
+  assert.match(view.detail, /Monthly API request limit/)
+  assert.ok(!/Can't reach/.test(view.detail))
+  // No retry and no re-login fixes a plan limit, so neither is offered.
+  assert.ok(!/watch --once|sal login/.test(view.fix.run))
+  assert.match(view.fix.run, /sal doctor/)
+  // The counts it last knew are still worth showing.
+  assert.equal(view.badge, "13")
+})
+
+test("blocked is not dimmed, because the numbers on screen are still real", () => {
+  const refused = Model.parse(JSON.stringify(Object.assign({}, doc, { state: "blocked", live: false })))
+  assert.equal(Model.view(refused, publishedAt, settings, true).dim, false)
+})
