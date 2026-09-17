@@ -41,9 +41,14 @@ two and announce every mention twice.
 
 ## Install
 
+> **`sal` is not publicly installable yet.** `saltare-cli` is a private repo, so
+> step 1 below only works if you have access to it. Until that changes this
+> widget will sit in its `setup` state for anyone else, saying so plainly
+> rather than pretending. If you are here early: that is the thing to wait for.
+
 ```sh
 # 1. the CLI that holds the session
-go install github.com/jkthorne/saltare-cli/cmd/sal@latest   # or a release tarball
+go install github.com/jkthorne/saltare-cli/cmd/sal@latest   # needs repo access today
 sal login --server https://saltare.ai
 
 # 2. the watcher that publishes the state file
