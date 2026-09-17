@@ -89,8 +89,13 @@ Bind it in `~/.config/hypr/bindings.lua` — the keybind is yours, so the plugin
 cannot ship it:
 
 ```lua
-o.bind("SUPER + S", "Saltare capture", "omarchy-shell shell toggle saltare.workspace")
+o.bind("SUPER + SHIFT + S", "Saltare capture", "omarchy-shell shell toggle saltare.workspace")
 ```
+
+**Not `SUPER + S`** — that is Omarchy's scratchpad toggle, and taking a stock
+binding to gain a mnemonic is a bad trade. Check yours with
+`omarchy menu keybindings --print` before choosing; if you want a key that is
+already bound, `hl.unbind` it on the line above.
 
 One field. What you type decides where it goes, and the line under the field
 tells you where before you commit:
