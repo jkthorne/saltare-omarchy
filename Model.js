@@ -216,17 +216,26 @@ function badge(unread) {
 }
 
 // channelLabel puts the sigil back on. The daemon deliberately sends a bare
-// title, because a DM's title is a person's name and prefixing it with "#"
+// title, because a conversation's title is a name and prefixing it with "#"
 // would be a lie about what it is.
+//
+// The kinds are the server's enum (app/models/channel.rb): public_channel,
+// private_channel, dm, discussion, agent_dm, thread, agent_collaboration.
+// Guessing at them is how "#DevOps Monitor" reached a live bar — only the two
+// real channel kinds take a hash.
 function channelLabel(channel) {
   var title = String((channel && channel.title) || "")
   switch (channel && channel.kind) {
-  case "dm":
-    return title
+  case "public_channel":
+  case "private_channel":
+    return "#" + title
   case "thread":
+  case "discussion":
     return "↳ " + title
   default:
-    return "#" + title
+    // dm, agent_dm, agent_collaboration, and anything the server adds later:
+    // a name stands on its own, and an unknown kind is safer bare than wrong.
+    return title
   }
 }
 

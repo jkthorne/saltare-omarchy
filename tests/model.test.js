@@ -23,8 +23,8 @@ test("the golden document parses and carries the shape the widget draws", () => 
   const snapshot = loaded()
   assert.equal(snapshot.status, "loaded")
   assert.equal(snapshot.doc.schema, Model.SCHEMA)
-  assert.equal(snapshot.doc.totals.unread, 13)
-  assert.equal(snapshot.doc.channels.length, 3)
+  assert.equal(snapshot.doc.totals.unread, 17)
+  assert.equal(snapshot.doc.channels.length, 4)
   assert.equal(snapshot.doc.work.overdue.length, 1)
 })
 
@@ -94,7 +94,7 @@ test("past staleAfterSec the watcher is stopped, and the last counts stay on scr
   assert.equal(view.state, "stopped")
   assert.equal(view.stale, true)
   // A bar that drops to zero when its feed dies has told you something false.
-  assert.equal(view.badge, "13")
+  assert.equal(view.badge, "17")
   assert.match(view.detail, /2m ago/)
   assert.match(view.fix.run, /sal watch --install-service/)
 })
@@ -113,7 +113,7 @@ test("a dropped socket is offline, and offline says which server and how old", (
   const dropped = Model.parse(JSON.stringify(Object.assign({}, doc, { live: false })))
   const view = Model.view(dropped, publishedAt + 60 * 1000, settings, true)
   assert.equal(view.state, "offline")
-  assert.equal(view.badge, "13")
+  assert.equal(view.badge, "17")
   assert.match(view.detail, /saltare\.ai/)
   assert.match(view.detail, /1m ago/)
 })
@@ -178,15 +178,25 @@ test("caps are visible: totals disagree with the list and the widget says by how
     totals: Object.assign({}, doc.totals, { unread: 40, notifications: 9 })
   })))
   const view = Model.view(capped, publishedAt, settings, true)
-  assert.equal(view.moreUnread, 40 - 13)
+  assert.equal(view.moreUnread, 40 - 17)
   assert.equal(view.moreNotifications, 8)
 })
 
 test("the sigil goes back on here, because the daemon sends a bare title on purpose", () => {
-  assert.equal(Model.channelLabel({ kind: "channel", title: "general" }), "#general")
-  // Prefixing a person's name with "#" would be a lie about what it is.
-  assert.equal(Model.channelLabel({ kind: "dm", title: "Alice Chen" }), "Alice Chen")
+  // The kinds are the server's enum, not a guess. Guessing produced
+  // "#DevOps Monitor" in a live bar: agent DMs are `agent_dm`, never `dm`.
+  assert.equal(Model.channelLabel({ kind: "public_channel", title: "general" }), "#general")
+  assert.equal(Model.channelLabel({ kind: "private_channel", title: "secret" }), "#secret")
   assert.equal(Model.channelLabel({ kind: "thread", title: "Q3 launch" }), "↳ Q3 launch")
+  assert.equal(Model.channelLabel({ kind: "discussion", title: "Fix the deploy" }), "↳ Fix the deploy")
+
+  // Prefixing a name with "#" would be a lie about what it is.
+  assert.equal(Model.channelLabel({ kind: "dm", title: "Alice Chen" }), "Alice Chen")
+  assert.equal(Model.channelLabel({ kind: "agent_dm", title: "DevOps Monitor" }), "DevOps Monitor")
+  assert.equal(Model.channelLabel({ kind: "agent_collaboration", title: "Squad" }), "Squad")
+
+  // A kind this plugin has never heard of is safer bare than wrong.
+  assert.equal(Model.channelLabel({ kind: "something_new", title: "Whatever" }), "Whatever")
 })
 
 test("a notification reads the way the web app's own does", () => {
@@ -239,7 +249,7 @@ test("the popup is one flat list, labelled by section", () => {
   const rows = Model.rows(view)
 
   assert.deepEqual(rows.map((r) => r.kind), [
-    "notification", "channel", "channel", "channel", "task", "task"
+    "notification", "channel", "channel", "channel", "channel", "task", "task"
   ])
   assert.deepEqual(
     rows.filter((r) => r.section !== "").map((r) => r.section),
@@ -256,8 +266,8 @@ test("every row knows the command its enter key runs", () => {
     assert.ok(row.command.startsWith("sal "), row.kind + " has no command")
   }
   assert.equal(rows[1].command, "sal open channel 'engineering'")
-  assert.equal(rows[4].command, "sal open task 'fix-deploy'")
-  assert.equal(rows[4].complete, "sal tasks complete 'fix-deploy'")
+  assert.equal(rows[5].command, "sal open task 'fix-deploy'")
+  assert.equal(rows[5].complete, "sal tasks complete 'fix-deploy'")
 })
 
 test("overdue work is marked urgent and today's is not", () => {
@@ -370,7 +380,7 @@ test("a server that answered and refused is blocked, not offline", () => {
   assert.ok(!/watch --once|sal login/.test(view.fix.run))
   assert.match(view.fix.run, /sal doctor/)
   // The counts it last knew are still worth showing.
-  assert.equal(view.badge, "13")
+  assert.equal(view.badge, "17")
 })
 
 test("blocked is not dimmed, because the numbers on screen are still real", () => {
