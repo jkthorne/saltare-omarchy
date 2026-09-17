@@ -1,8 +1,9 @@
 # saltare.workspace
 
-An [Omarchy](https://omarchy.org) bar widget for a [Saltare](https://saltare.ai)
-workspace: unread channels, the mentions waiting for you, and what is due
-today. Click a row and you land in it.
+An [Omarchy](https://omarchy.org) plugin for a [Saltare](https://saltare.ai)
+workspace. A bar widget — unread channels, the mentions waiting for you, and
+what is due today; click a row and you land in it. And a capture field on a
+keystroke, which decides for itself where what you typed should go.
 
 ```
 ◈ 13
@@ -76,6 +77,34 @@ Two of those are deliberate. **A stopped watcher keeps its last counts**
 rather than dropping to zero: a bar that blanks when its feed dies has told
 you something false. And **sign-in outranks a stale file**, because restarting
 a watcher that has nothing to sign in with fixes nothing.
+
+## Capture
+
+Bind it in `~/.config/hypr/bindings.lua` — the keybind is yours, so the plugin
+cannot ship it:
+
+```lua
+o.bind("SUPER + S", "Saltare capture", "omarchy-shell shell toggle saltare.workspace")
+```
+
+One field. What you type decides where it goes, and the line under the field
+tells you where before you commit:
+
+| You type | Where it goes |
+|---|---|
+| `#general ship it` | a message in #general |
+| `@researcher what changed?` | that agent's DM |
+| `! fix the deploy` | a task, self-assigned |
+| `!2026-09-20 ship the plugin` | a task, due then |
+| `/doc Q3 notes` | a new document |
+| `what broke last night` | Claude, answered in place |
+
+No sigil means ask. That is deliberate: the common case for a field you
+summoned with a keystroke is a thought, and making the common case the one
+with no sigil is what makes the sigils worth learning. `enter` sends, `esc`
+closes and keeps nothing, `ctrl+c` stops an answer mid-stream. A command that
+fails leaves your text in the field — losing what someone typed is the one
+unforgivable failure for a capture field.
 
 ## Keys
 

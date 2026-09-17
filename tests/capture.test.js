@@ -1,0 +1,123 @@
+const test = require("node:test")
+const assert = require("node:assert/strict")
+const fs = require("node:fs")
+const path = require("node:path")
+const Capture = require("../Capture.js")
+
+test("#channel posts a message", () => {
+  const routed = Capture.route("#general ship it")
+  assert.equal(routed.kind, "send")
+  assert.equal(routed.target, "general")
+  assert.equal(routed.command, "sal send 'general' 'ship it'")
+  assert.equal(routed.summary, "Send to #general")
+})
+
+test("@agent messages an agent's DM", () => {
+  const routed = Capture.route("@researcher what changed in Q3?")
+  assert.equal(routed.kind, "agent")
+  assert.equal(routed.command, "sal agents message 'researcher' 'what changed in Q3?'")
+})
+
+test("/doc starts a document", () => {
+  const routed = Capture.route("/doc Q3 launch notes")
+  assert.equal(routed.kind, "doc")
+  assert.equal(routed.command, "sal docs new 'Q3 launch notes'")
+})
+
+test("! files a task, with or without a space after the bang", () => {
+  for (const input of ["! fix the deploy", "!fix the deploy"]) {
+    const routed = Capture.route(input)
+    assert.equal(routed.kind, "task", input)
+    assert.equal(routed.command, "sal tasks add 'fix the deploy'", input)
+    assert.equal(routed.due, "")
+  }
+})
+
+test("a leading ISO date on a task is its due date, spaced or not", () => {
+  // A grammar that cares about a space is a grammar you get wrong at speed.
+  for (const input of ["!2026-09-20 ship the plugin", "! 2026-09-20 ship the plugin"]) {
+    const routed = Capture.route(input)
+    assert.equal(routed.due, "2026-09-20", input)
+    assert.equal(routed.command, "sal tasks add 'ship the plugin' --due '2026-09-20'", input)
+    assert.equal(routed.summary, "New task, due 2026-09-20")
+  }
+})
+
+test("something that only looks like a date stays in the title", () => {
+  const routed = Capture.route("!2026 planning")
+  assert.equal(routed.due, "")
+  assert.equal(routed.command, "sal tasks add '2026 planning'")
+})
+
+test("anything without a sigil is a question, because that is the common case", () => {
+  const routed = Capture.route("what broke the deploy last night")
+  assert.equal(routed.kind, "ask")
+  assert.equal(routed.command, "sal ask 'what broke the deploy last night'")
+  assert.equal(Capture.streams(routed), true)
+})
+
+test("only asking streams back into the overlay", () => {
+  for (const input of ["#general hi", "@scout hi", "!a thing", "/doc a doc"]) {
+    assert.equal(Capture.streams(Capture.route(input)), false, input)
+  }
+})
+
+test("a sigil with nothing after it is not an action", () => {
+  for (const input of ["", "   ", "#general", "#general   ", "@scout", "!", "!   ", "/doc"]) {
+    assert.equal(Capture.route(input), null, JSON.stringify(input))
+  }
+})
+
+test("a bare # or @ is text, not a broken sigil", () => {
+  assert.equal(Capture.route("#").kind, "ask")
+  assert.equal(Capture.route("@").kind, "ask")
+})
+
+test("everything that reaches a shell is quoted", () => {
+  const routed = Capture.route("#general '; rm -rf ~; echo '")
+  assert.equal(routed.command, "sal send 'general' ''\\''; rm -rf ~; echo '\\'''")
+
+  const asked = Capture.route("what about $(whoami) and `id`?")
+  assert.ok(asked.command.startsWith("sal ask '"))
+  assert.ok(asked.command.endsWith("'"))
+  // Inside single quotes nothing expands; the only escape that matters is the
+  // quote itself, and there isn't one here.
+  assert.ok(!asked.command.includes("'\\''"))
+})
+
+test("the hint teaches the grammar it implements", () => {
+  const hint = Capture.hint()
+  for (const sigil of ["#", "@", "!", "/doc"]) {
+    assert.ok(hint.includes(sigil), "hint omits " + sigil)
+  }
+})
+
+test("the overlay holds no session and issues no request", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "Capture.qml"), "utf8")
+  for (const forbidden of ["XMLHttpRequest", "WebSocket", "/api/v1", "access_token"]) {
+    assert.ok(!source.includes(forbidden), "Capture.qml must not reference " + forbidden)
+  }
+  // And it builds no command by hand — Capture.js is the only place that does.
+  // Named subcommands only: "sal exited 3" is an error message, not an argv.
+  assert.ok(!/"sal (send|ask|tasks|docs|agents|open|status|watch)\b/.test(source),
+    "Capture.qml is assembling a command instead of asking Capture.js")
+})
+
+test("the overlay answers the shell's summon contract", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "Capture.qml"), "utf8")
+  // The shell summons an overlay by calling open()/close() on whatever the
+  // entry point loads, so the root has to be an Item that has them — not the
+  // window itself.
+  assert.match(source, /function open\(/)
+  assert.match(source, /function close\(/)
+  assert.match(source, /PanelWindow \{/)
+  assert.match(source, /visible: root\.opened/)
+  assert.match(source, /WlrKeyboardFocus\.Exclusive/)
+})
+
+test("the overlay is declared in the manifest, or nothing can summon it", () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "manifest.json"), "utf8"))
+  assert.ok(manifest.kinds.includes("overlay"))
+  assert.equal(manifest.entryPoints.overlay, "Capture.qml")
+  assert.ok(fs.existsSync(path.join(__dirname, "..", manifest.entryPoints.overlay)))
+})

@@ -340,7 +340,8 @@ test("the manifest declares what the shell needs and what the settings pane show
   const manifest = JSON.parse(qml("manifest.json"))
   assert.equal(manifest.schemaVersion, 1)
   assert.equal(manifest.id, "saltare.workspace")
-  assert.deepEqual(manifest.kinds, ["bar-widget"])
+  // The overlay joined later; the widget is what this file is about.
+  assert.ok(manifest.kinds.includes("bar-widget"))
   assert.equal(manifest.entryPoints.barWidget, "Panel.qml")
   assert.ok(fs.existsSync(path.join(__dirname, "..", manifest.entryPoints.barWidget)))
 

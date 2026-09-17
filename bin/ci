@@ -388,7 +388,7 @@ CI_DEFAULT_TIER=linux
 
 tier_linux() {
   step "Syntax" js_syntax
-  step "Test" node --test tests/model.test.js
+  step "Test" js_tests
 
   if have omarchy; then
     step "Manifest" omarchy plugin validate .
@@ -401,6 +401,15 @@ tier_linux() {
   else
     skip "Golden matches the daemon" "saltare-cli is not checked out beside this repo"
   fi
+}
+
+# Every test file, named explicitly. `node --test tests/` walks the directory
+# and, in this version, reports one failing "tests" entry instead of running
+# them — which reads as a broken suite rather than a missing glob.
+js_tests() {
+  have node || { echo "node is not on PATH" >&2; return 1; }
+  # shellcheck disable=SC2046  # deliberate word splitting: one arg per file
+  node --test $(find tests -name '*.test.js' | sort)
 }
 
 # node --check every JavaScript file. The test run would catch a syntax error

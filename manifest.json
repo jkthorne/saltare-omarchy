@@ -5,18 +5,23 @@
   "version": "0.1.0",
   "author": "Jack Thorne",
   "license": "MIT",
-  "description": "Unread channels, mentions and today's work from your Saltare workspace, in the bar. Reads a state file published by the sal CLI, which holds the session — this plugin stores no credentials and makes no network requests.",
+  "description": "Unread channels, mentions and today's work from your Saltare workspace, plus a capture field that sends to a channel, files a task, starts a document or asks an agent. Reads a state file published by the sal CLI, which holds the session \u2014 this plugin stores no credentials and makes no network requests.",
   "kinds": [
-    "bar-widget"
+    "bar-widget",
+    "overlay"
   ],
   "entryPoints": {
-    "barWidget": "Panel.qml"
+    "barWidget": "Panel.qml",
+    "overlay": "Capture.qml"
   },
   "barWidget": {
     "displayName": "Saltare",
-    "description": "Unread, mentions, and today's work — read from the sal watch state file.",
+    "description": "Unread, mentions, and today's work \u2014 read from the sal watch state file.",
     "category": "AI",
-    "aliases": ["saltare", "workspace"],
+    "aliases": [
+      "saltare",
+      "workspace"
+    ],
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
