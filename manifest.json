@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "id": "saltare.workspace",
+  "name": "Saltare",
+  "version": "0.1.0",
+  "author": "Jack Thorne",
+  "license": "MIT",
+  "description": "Unread channels, mentions and today's work from your Saltare workspace, in the bar. Reads a state file published by the sal CLI, which holds the session — this plugin stores no credentials and makes no network requests.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Saltare",
+    "description": "Unread, mentions, and today's work — read from the sal watch state file.",
+    "category": "AI",
+    "aliases": ["saltare", "workspace"],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "statePath": "",
+      "showWhenIdle": true,
+      "staleAfterSec": 120
+    },
+    "schema": [
+      {
+        "key": "statePath",
+        "type": "path",
+        "label": "State file",
+        "defaultValue": "",
+        "description": "Defaults to $XDG_STATE_HOME/saltare/watch.json"
+      },
+      {
+        "key": "showWhenIdle",
+        "type": "boolean",
+        "label": "Show with nothing waiting",
+        "defaultValue": true,
+        "description": "Off hides the widget until something is unread."
+      },
+      {
+        "key": "staleAfterSec",
+        "type": "integer",
+        "label": "Treat the state as stale after (seconds)",
+        "min": 30,
+        "max": 600,
+        "step": 10,
+        "defaultValue": 120
+      }
+    ]
+  }
+}
