@@ -1,0 +1,177 @@
+#!/usr/bin/env python3
+"""Write each of the widget's states to a file, so you can watch the bar.
+
+The widget is a renderer over one JSON document, which means every state it can
+be in is reachable by writing that document — no broken server, no expired
+session, no waiting for a workspace to go quiet. That is worth having as a tool
+rather than as a paragraph, because the states nobody exercises are the ones
+that rot.
+
+    bin/demo-states --list              # what it can show
+    bin/demo-states ok stopped blocked  # write these, pausing between
+    bin/demo-states --all               # every state in turn
+    bin/demo-states --write ok          # write one and exit
+
+Point the widget at the file first, and put it back after:
+
+    omarchy bar set saltare.workspace statePath /tmp/saltare-demo.json
+    omarchy bar set saltare.workspace statePath ""
+"""
+import argparse
+import datetime
+import json
+import os
+import pathlib
+import sys
+
+DEFAULT_PATH = "/tmp/saltare-demo.json"
+
+
+def now(offset_seconds=0):
+    stamp = datetime.datetime.now(datetime.timezone.utc)
+    stamp -= datetime.timedelta(seconds=offset_seconds)
+    return stamp.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def document(**overrides):
+    base = {
+        "schema": 1,
+        "updated_at": now(),
+        "heartbeat_sec": 30,
+        "state": "ok",
+        "live": True,
+        "server": "https://saltare.ai",
+        "workspace": {"slug": "acme", "name": "Acme"},
+        "user": {"id": 7, "name": "Jack Thorne"},
+        "totals": {"unread": 13, "mentions": 1, "notifications": 1, "overdue": 1, "due_today": 1},
+        "channels": [
+            {"slug": "engineering", "title": "engineering", "kind": "public_channel", "unread": 9, "mentioned": False},
+            {"slug": "general", "title": "general", "kind": "public_channel", "unread": 3, "mentioned": True},
+            {"slug": "agent-dm-2-1", "title": "Code Reviewer", "kind": "agent_dm", "unread": 1, "mentioned": False},
+        ],
+        "notifications": [{
+            "id": 991, "action": "mentioned", "actor": "Alice Chen",
+            "description": "mentioned you", "channel_slug": "general",
+            "preview": "can you look at the deploy?", "task_slug": "", "task_title": "",
+            "created_at": now(120),
+        }],
+        "work": {
+            "overdue": [{"slug": "fix-deploy", "title": "Fix the deploy", "due_date": "2026-09-14", "state": "open"}],
+            "today": [{"slug": "ship-plugin", "title": "Ship the Omarchy plugin", "due_date": "2026-09-17", "state": "in_progress"}],
+        },
+        "error": "",
+    }
+    base.update(overrides)
+    return base
+
+
+def quiet():
+    return document(
+        totals={"unread": 0, "mentions": 0, "notifications": 0, "overdue": 0, "due_today": 0},
+        channels=[], notifications=[], work={"overdue": [], "today": []},
+    )
+
+
+# Each state, and what you should see when it is on screen.
+STATES = {
+    "ok": (
+        document(),
+        "13 unread, urgent (a mention is waiting). Popup lists mentions, unread, work.",
+    ),
+    "quiet": (
+        quiet(),
+        "No badge. Hidden entirely if you set showWhenIdle false.",
+    ),
+    "offline": (
+        document(live=False),
+        "Counts still shown, dimmed accent. \"Can't reach https://saltare.ai … just now\".",
+    ),
+    "blocked": (
+        document(
+            live=False, state="blocked",
+            error="Monthly API request limit reached (1000). Upgrade your plan for more requests.",
+        ),
+        "The server's own sentence, not \"can't reach\". Offers sal doctor.",
+    ),
+    "stopped": (
+        document(updated_at=now(600)),
+        "Badge struck through, counts kept. \"The watcher isn't running — 10m ago\".",
+    ),
+    "signin": (
+        document(state="logged-out", error="session expired; run `sal login`"),
+        "Dim mark, no counts. Button opens a terminal on sal login.",
+    ),
+    "unsupported": (
+        document(schema=99),
+        "\"Written by a newer sal than this plugin understands\". Offers plugin update.",
+    ),
+}
+
+
+def write(path, name):
+    body, expect = STATES[name]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".part")
+    tmp.write_text(json.dumps(body, indent=2) + "\n")
+    # Rename, the way the daemon publishes — a half-written file is a parse
+    # error in the bar, and this tool should not be the one thing that produces
+    # one.
+    tmp.replace(path)
+    return expect
+
+
+def main():
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("states", nargs="*")
+    parser.add_argument("--path", default=os.environ.get("SALTARE_DEMO_PATH", DEFAULT_PATH))
+    parser.add_argument("--all", action="store_true")
+    parser.add_argument("--list", action="store_true")
+    parser.add_argument("--write", metavar="STATE")
+    parser.add_argument("-h", "--help", action="store_true")
+    args = parser.parse_args()
+
+    if args.help:
+        print(__doc__)
+        return 0
+    if args.list:
+        for name, (_, expect) in STATES.items():
+            print(f"  {name:12} {expect}")
+        return 0
+
+    path = pathlib.Path(args.path).expanduser()
+
+    if args.write:
+        if args.write not in STATES:
+            print(f"unknown state {args.write!r}; try --list", file=sys.stderr)
+            return 1
+        print(f"{args.write} → {path}")
+        print(f"  expect: {write(path, args.write)}")
+        return 0
+
+    names = list(STATES) if args.all else args.states
+    if not names:
+        print(__doc__)
+        return 1
+    unknown = [n for n in names if n not in STATES]
+    if unknown:
+        print(f"unknown state(s): {', '.join(unknown)}; try --list", file=sys.stderr)
+        return 1
+
+    print(f"Writing to {path}. Point the widget at it first:")
+    print(f"  omarchy bar set saltare.workspace statePath {path}\n")
+    for i, name in enumerate(names):
+        expect = write(path, name)
+        print(f"  {name:12} {expect}")
+        if i < len(names) - 1:
+            try:
+                input("             ↵ for the next one ")
+            except (EOFError, KeyboardInterrupt):
+                print()
+                break
+    print("\nPut it back with:")
+    print("  omarchy bar set saltare.workspace statePath \"\"")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

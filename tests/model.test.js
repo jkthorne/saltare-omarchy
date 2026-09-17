@@ -393,3 +393,32 @@ test("blocked is not dimmed, because the numbers on screen are still real", () =
   const refused = Model.parse(JSON.stringify(Object.assign({}, doc, { state: "blocked", live: false })))
   assert.equal(Model.view(refused, publishedAt, settings, true).dim, false)
 })
+
+test("every demo state renders as bin/demo-states advertises it", () => {
+  // The tool is how a person walks the states before shipping a change, so its
+  // claims are checked here rather than trusted. A demo that quietly stopped
+  // producing the state it names would be worse than no demo.
+  const { execFileSync } = require("node:child_process")
+  const os = require("node:os")
+  const tmp = path.join(os.tmpdir(), "saltare-demo-test.json")
+  const tool = path.join(__dirname, "..", "bin", "demo-states")
+
+  const expected = {
+    ok: "ok", quiet: "ok", offline: "offline", blocked: "blocked",
+    stopped: "stopped", signin: "signin", unsupported: "unsupported",
+  }
+
+  for (const [name, wanted] of Object.entries(expected)) {
+    execFileSync(tool, ["--write", name, "--path", tmp], { stdio: "ignore" })
+    const view = Model.view(Model.parse(fs.readFileSync(tmp, "utf8")), Date.now(), {}, true)
+    assert.equal(view.state, wanted, `demo state "${name}" rendered as "${view.state}"`)
+  }
+
+  // And the two that carry counts through a failure really do keep them.
+  for (const name of ["offline", "blocked", "stopped"]) {
+    execFileSync(tool, ["--write", name, "--path", tmp], { stdio: "ignore" })
+    const view = Model.view(Model.parse(fs.readFileSync(tmp, "utf8")), Date.now(), {}, true)
+    assert.equal(view.badge, "13", `${name} should keep its last known counts`)
+  }
+  fs.rmSync(tmp, { force: true })
+})

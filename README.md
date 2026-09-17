@@ -140,6 +140,23 @@ node --test tests/model.test.js    # all of the logic
 omarchy plugin validate .          # the manifest
 ```
 
+### Seeing every state without breaking anything
+
+The widget is a renderer over one JSON document, so every state it can be in is
+reachable by writing that document — no expired session, no unplugged network,
+no waiting for a workspace to go quiet.
+
+```sh
+omarchy bar set saltare.workspace statePath /tmp/saltare-demo.json
+bin/demo-states --all          # ↵ between states, watch the bar
+omarchy bar set saltare.workspace statePath ""
+```
+
+`bin/demo-states --list` names each one and what you should see. Walk them
+before shipping a change: the states nobody exercises are the ones that rot,
+and `probing` only exists because running it once showed the widget telling a
+machine with `sal` installed to go and install it.
+
 `Model.js` holds every decision — which state we are in, what the badge says,
 what each row runs — as pure functions, and the QML is a renderer over it.
 Omarchy's plugin API is young; the parts worth protecting from it are the parts
