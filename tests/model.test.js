@@ -11,7 +11,7 @@ const fixturePath = path.join(__dirname, "fixtures", "watch.json")
 const fixture = fs.readFileSync(fixturePath, "utf8")
 const doc = JSON.parse(fixture)
 const publishedAt = Date.parse(doc.updated_at)
-const settings = { staleAfterSec: 120, showWhenIdle: true }
+const settings = { staleAfterSec: 0, showWhenIdle: true } // 0 = follow the daemon
 
 function loaded() {
   return Model.parse(fixture)
@@ -99,13 +99,19 @@ test("past staleAfterSec the watcher is stopped, and the last counts stay on scr
   assert.match(view.fix.run, /sal watch --install-service/)
 })
 
-test("the staleness boundary moves with the clock alone", () => {
-  assert.equal(Model.state(loaded(), publishedAt + 119 * 1000, settings, true), "ok")
-  assert.equal(Model.state(loaded(), publishedAt + 121 * 1000, settings, true), "stopped")
+test("staleness follows the daemon's heartbeat, so the readers cannot disagree", () => {
+  // Three missed beats — the same rule State.Stale uses in saltare-cli. They
+  // briefly differed (90s there, a hardcoded 120s here), and a bar widget
+  // reading "ok" beside a waybar module reading "stopped" is the seam leaking
+  // into the user's face.
+  assert.equal(Model.staleLimit(doc, {}), 3 * doc.heartbeat_sec)
+  assert.equal(Model.state(loaded(), publishedAt + 89 * 1000, settings, true), "ok")
+  assert.equal(Model.state(loaded(), publishedAt + 91 * 1000, settings, true), "stopped")
 })
 
-test("staleAfterSec is honoured, so a slow machine can stop being called dead", () => {
+test("an explicit staleAfterSec overrides the heartbeat, for a machine that needs patience", () => {
   const patient = { staleAfterSec: 600 }
+  assert.equal(Model.staleLimit(doc, patient), 600)
   assert.equal(Model.state(loaded(), publishedAt + 300 * 1000, patient, true), "ok")
 })
 

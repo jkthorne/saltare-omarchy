@@ -56,7 +56,13 @@ function statePath(setting, xdgStateHome, home) {
 
 // ── the view ────────────────────────────────────────────────────────────
 
-var DEFAULT_STALE_SEC = 120
+// Staleness follows the daemon's own heartbeat by default: three missed beats,
+// the same rule State.Stale uses in saltare-cli. The document carries
+// heartbeat_sec precisely so both ends can agree without hardcoding a number
+// twice — which they briefly did not, and a bar widget saying "ok" beside a
+// waybar module saying "stopped" is the seam leaking into the user's face.
+var DEFAULT_HEARTBEAT_SEC = 30
+var MISSED_BEATS = 3
 
 // STATES in precedence order. The order is the argument:
 //
@@ -95,8 +101,17 @@ function state(snapshot, nowMs, settings, salPresent) {
 }
 
 function isStale(doc, nowMs, settings) {
-  var limit = number(settings && settings.staleAfterSec, DEFAULT_STALE_SEC)
-  return ageSeconds(doc, nowMs) > limit
+  return ageSeconds(doc, nowMs) > staleLimit(doc, settings)
+}
+
+// staleLimit is three of the daemon's heartbeats, unless the user has set an
+// explicit patience. 0 or unset means "follow the daemon".
+function staleLimit(doc, settings) {
+  var configured = number(settings && settings.staleAfterSec, 0)
+  if (configured > 0) return configured
+  var beat = number(doc && doc.heartbeat_sec, DEFAULT_HEARTBEAT_SEC)
+  if (beat <= 0) beat = DEFAULT_HEARTBEAT_SEC
+  return MISSED_BEATS * beat
 }
 
 function ageSeconds(doc, nowMs) {
@@ -369,6 +384,7 @@ if (typeof module !== "undefined") {
     notificationLine: notificationLine,
     agoLabel: agoLabel,
     ageSeconds: ageSeconds,
+    staleLimit: staleLimit,
     fixFor: fixFor,
     openCommand: openCommand,
     completeCommand: completeCommand,

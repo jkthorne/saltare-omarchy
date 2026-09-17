@@ -27,7 +27,7 @@
     "defaults": {
       "statePath": "",
       "showWhenIdle": true,
-      "staleAfterSec": 120
+      "staleAfterSec": 0
     },
     "schema": [
       {
@@ -48,10 +48,11 @@
         "key": "staleAfterSec",
         "type": "integer",
         "label": "Treat the state as stale after (seconds)",
-        "min": 30,
+        "min": 0,
         "max": 600,
         "step": 10,
-        "defaultValue": 120
+        "defaultValue": 0,
+        "description": "0 follows the daemon's own heartbeat \u2014 three missed beats, the same rule sal status uses."
       }
     ]
   }
