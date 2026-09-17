@@ -116,6 +116,20 @@ the code.
 `internal/watch/testdata/golden.json`. That is the contract between the two
 repos: a schema change that lands on one side fails on the other.
 
+Two things about the edit loop, both learned the hard way:
+
+- **Do not symlink your checkout into `~/.config/omarchy/plugins/`.** The shell
+  watches that directory with inotify, which does not follow symlinks, so your
+  edits never trigger a reload. Copy the tree in.
+- **`omarchy-shell shell rescanPlugins` is not always enough.** It reloaded a
+  cached compiled component here across several edits, reporting warnings
+  against line numbers the file no longer had. When a change seems not to take,
+  `omarchy-restart-shell` and trust that.
+
+The state table above is not decoration — walk all six states before shipping a
+change. `probing` exists because running it revealed the widget told a machine
+with `sal` installed to go and install it, for as long as the lookup took.
+
 ## License
 
 MIT.

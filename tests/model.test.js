@@ -44,6 +44,26 @@ test("a file caught mid-rename is a state, not an exception", () => {
 
 // ── the five states ─────────────────────────────────────────────────────
 
+test("before the CLI lookup returns, the widget says it is checking rather than guessing", () => {
+  // Found by running it: the lookup is an async process launch, so the first
+  // frames after a shell start have no answer yet — and "install the CLI" is
+  // the worst thing to guess, because it tells someone who already installed
+  // it to go and install it.
+  const view = Model.view(Model.missing(), publishedAt, settings, null)
+  assert.equal(view.state, "probing")
+  assert.equal(view.fix, null)
+  assert.equal(view.badge, "")
+  assert.match(view.detail, /Looking for/)
+  assert.equal(Model.rows(view).length, 0)
+
+  // undefined is the same not-yet-known, not a third meaning.
+  assert.equal(Model.state(Model.missing(), publishedAt, settings, undefined), "probing")
+})
+
+test("a published document outranks the lookup — counts show before the probe returns", () => {
+  assert.equal(Model.state(loaded(), publishedAt, settings, null), "ok")
+})
+
 test("no file and no CLI is setup, and setup has no button because there is nothing to press", () => {
   const view = Model.view(Model.missing(), publishedAt, settings, false)
   assert.equal(view.state, "setup")

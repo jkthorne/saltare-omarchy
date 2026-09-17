@@ -70,10 +70,16 @@ var DEFAULT_STALE_SEC = 120
 //   socket and not the other way round.
 //   offline outranks a mention, because "these numbers are last-known"
 //   matters more than "someone called your name" when both are true.
+// salPresent is deliberately tri-state. Looking for the CLI is an async
+// process launch, so for the first frames after the shell starts we do not
+// know — and "setup" is the worst thing to guess, because it tells someone who
+// already installed sal to go install it. Unknown says "checking" instead.
 function state(snapshot, nowMs, settings, salPresent) {
   var doc = snapshot && snapshot.doc
   var loaded = snapshot && snapshot.status === "loaded" && doc
 
+  if (!loaded && salPresent === null) return "probing"
+  if (!loaded && salPresent === undefined) return "probing"
   if (!loaded && !salPresent) return "setup"
   if (snapshot && snapshot.status === "unsupported") return "unsupported"
   if (!loaded) return "signin"
@@ -100,6 +106,8 @@ function ageSeconds(doc, nowMs) {
 // offering a button that cannot work.
 function fixFor(name) {
   switch (name) {
+  case "probing":
+    return null
   case "setup":
     return {
       label: "Install the sal CLI",
@@ -129,6 +137,8 @@ function fixFor(name) {
 
 function detailFor(name, doc, nowMs) {
   switch (name) {
+  case "probing":
+    return "Looking for the sal CLI…"
   case "setup":
     return "This widget reads a file the sal CLI writes. Nothing is installed yet."
   case "signin":
@@ -149,7 +159,8 @@ function detailFor(name, doc, nowMs) {
 function view(snapshot, nowMs, settings, salPresent) {
   var name = state(snapshot, nowMs, settings, salPresent)
   var doc = (snapshot && snapshot.doc) || null
-  var usable = name !== "setup" && name !== "signin" && name !== "unsupported" && doc
+  var usable = name !== "setup" && name !== "signin" && name !== "unsupported"
+    && name !== "probing" && doc
   var totals = (usable && doc.totals) || { unread: 0, mentions: 0, notifications: 0, overdue: 0, due_today: 0 }
 
   var channels = (usable && doc.channels) || []
@@ -166,7 +177,7 @@ function view(snapshot, nowMs, settings, salPresent) {
     // Stale counts are shown struck through rather than blanked: a bar that
     // drops to zero when its feed dies has told you something false.
     stale: name === "stopped",
-    dim: name === "setup" || name === "signin" || name === "stopped" || name === "unsupported",
+    dim: name !== "ok" && name !== "offline",
     badge: badge(totals.unread),
     urgent: number(totals.mentions, 0) > 0 && (name === "ok" || name === "offline"),
     workspace: (usable && doc.workspace && doc.workspace.name) || "Saltare",
@@ -242,7 +253,8 @@ function agoLabel(doc, nowMs) {
 // that knows about sections — and it is the part a test can actually hold.
 function rows(v) {
   var out = []
-  if (!v || v.state === "setup" || v.state === "signin" || v.state === "unsupported") {
+  if (!v || v.state === "setup" || v.state === "signin" || v.state === "unsupported"
+      || v.state === "probing") {
     if (v && v.fix && v.fix.run !== "") {
       out.push({ kind: "fix", section: "", label: v.fix.label, sub: "", command: v.fix.run })
     }

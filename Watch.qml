@@ -16,7 +16,10 @@ Item {
 
   property var settings: ({})
   property var snapshot: Model.missing()
-  property bool salPresent: false
+  // null until the lookup returns. Not false: the widget must not tell someone
+  // who has sal installed to go and install it during the first frames after
+  // the shell starts.
+  property var salPresent: null
 
   // Staleness has to keep being true while the panel sits open, so the clock
   // ticks on its own rather than only when the file changes.

@@ -71,6 +71,7 @@ Panel {
 
   property var completed: ({})
 
+
   Watch {
     id: watch
     settings: root.settings
@@ -81,6 +82,7 @@ Panel {
   }
 
   Process { id: launcher }
+
 
   BarIconButton {
     id: button
@@ -97,7 +99,7 @@ Panel {
             anchors.verticalCenter: parent.verticalCenter
             text: "◈"
             font.family: root.fontFamily
-            font.pixelSize: Style.font.normal
+            font.pixelSize: Style.font.body
             color: root.barMark
             opacity: root.view.dim ? 0.6 : 1.0
           }
@@ -106,7 +108,7 @@ Panel {
             visible: root.view.badge !== ""
             text: root.view.badge
             font.family: root.fontFamily
-            font.pixelSize: Style.font.small
+            font.pixelSize: Style.font.bodySmall
             font.strikeout: root.view.stale
             color: root.barMark
             opacity: root.view.dim ? 0.6 : 1.0
@@ -182,7 +184,7 @@ Panel {
             wrapMode: Text.WordWrap
             color: root.dim
             font.family: root.fontFamily
-            font.pixelSize: Style.font.small
+            font.pixelSize: Style.font.bodySmall
           }
 
           Text {
@@ -192,7 +194,7 @@ Panel {
             wrapMode: Text.WordWrap
             color: root.dim
             font.family: root.fontFamily
-            font.pixelSize: Style.font.small
+            font.pixelSize: Style.font.bodySmall
           }
 
           Repeater {
@@ -236,7 +238,7 @@ Panel {
                     elide: Text.ElideRight
                     text: modelData.label
                     font.family: root.fontFamily
-                    font.pixelSize: Style.font.normal
+                    font.pixelSize: Style.font.body
                     font.strikeout: !!root.completed[modelData.command]
                     color: modelData.urgent ? root.urgent : root.foreground
                   }
@@ -244,7 +246,7 @@ Panel {
                     id: subLabel
                     text: modelData.sub || ""
                     font.family: root.fontFamily
-                    font.pixelSize: Style.font.small
+                    font.pixelSize: Style.font.bodySmall
                     color: root.dim
                   }
                 }
@@ -265,7 +267,7 @@ Panel {
             text: "+" + (root.view.moreUnread + root.view.moreNotifications) + " more"
             color: root.dim
             font.family: root.fontFamily
-            font.pixelSize: Style.font.small
+            font.pixelSize: Style.font.bodySmall
           }
 
           PanelSeparator { width: parent.width }
@@ -275,7 +277,7 @@ Panel {
             text: "j/k move · enter open · x complete · r refresh · o workspace"
             color: root.dim
             font.family: root.fontFamily
-            font.pixelSize: Style.font.small
+            font.pixelSize: Style.font.bodySmall
           }
         }
       }
