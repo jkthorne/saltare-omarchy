@@ -43,7 +43,7 @@ def document(**overrides):
         "server": "https://saltare.ai",
         "workspace": {"slug": "acme", "name": "Acme"},
         "user": {"id": 7, "name": "Jack Thorne"},
-        "totals": {"unread": 13, "mentions": 1, "notifications": 1, "overdue": 1, "due_today": 1},
+        "totals": {"unread": 13, "mentions": 1, "notifications": 1, "overdue": 1, "due_today": 1, "mail": 4},
         "channels": [
             {"slug": "engineering", "title": "engineering", "kind": "public_channel", "unread": 9, "mentioned": False},
             {"slug": "general", "title": "general", "kind": "public_channel", "unread": 3, "mentioned": True},
@@ -59,6 +59,8 @@ def document(**overrides):
             "overdue": [{"slug": "fix-deploy", "title": "Fix the deploy", "due_date": "2026-09-14", "state": "open"}],
             "today": [{"slug": "ship-plugin", "title": "Ship the Omarchy plugin", "due_date": "2026-09-17", "state": "in_progress"}],
         },
+        "mail": [{"slug": "ada-example-com", "name": "Ada Lovelace",
+                  "address": "ada@example.com", "unread": 4, "error": ""}],
         "error": "",
     }
     base.update(overrides)
@@ -67,8 +69,8 @@ def document(**overrides):
 
 def quiet():
     return document(
-        totals={"unread": 0, "mentions": 0, "notifications": 0, "overdue": 0, "due_today": 0},
-        channels=[], notifications=[], work={"overdue": [], "today": []},
+        totals={"unread": 0, "mentions": 0, "notifications": 0, "overdue": 0, "due_today": 0, "mail": 0},
+        channels=[], notifications=[], work={"overdue": [], "today": []}, mail=[],
     )
 
 
@@ -76,7 +78,14 @@ def quiet():
 STATES = {
     "ok": (
         document(),
-        "13 unread, urgent (a mention is waiting). Popup lists mentions, unread, work.",
+        "13 unread, urgent (a mention is waiting). Popup lists mentions, unread, work; "
+        "the header adds \"4 mail\".",
+    ),
+    "no-mail": (
+        document(totals={"unread": 13, "mentions": 1, "notifications": 1,
+                         "overdue": 1, "due_today": 1, "mail": 0}, mail=None),
+        "What a session minted before mail:read sees: everything else, and no "
+        "mail in the header at all.",
     ),
     "quiet": (
         quiet(),

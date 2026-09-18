@@ -188,8 +188,9 @@ function view(snapshot, nowMs, settings, salPresent) {
   var doc = (snapshot && snapshot.doc) || null
   var usable = name !== "setup" && name !== "signin" && name !== "unsupported"
     && name !== "probing" && doc
-  var totals = (usable && doc.totals) || { unread: 0, mentions: 0, notifications: 0, overdue: 0, due_today: 0 }
+  var totals = (usable && doc.totals) || { unread: 0, mentions: 0, notifications: 0, overdue: 0, due_today: 0, mail: 0 }
 
+  var mailList = (usable && doc.mail) || []
   var channels = (usable && doc.channels) || []
   var listed = 0
   for (var i = 0; i < channels.length; i++) listed += number(channels[i].unread, 0)
@@ -216,9 +217,42 @@ function view(snapshot, nowMs, settings, salPresent) {
     channels: channels.map(decorateChannel),
     notifications: (usable && doc.notifications) || [],
     work: (usable && doc.work) || { overdue: [], today: [] },
+    // Mail is a number in the summary line and nothing more, and the reason is
+    // the invariant one row below: every row in this popup knows the command
+    // its enter key runs. A mail row could not — there is no mail client on
+    // this desktop and no web mailbox on the server, because posta is the
+    // phone's. A count you glance at is the whole job of a bar widget; a
+    // section of rows that open nothing would be a door painted on a wall.
+    // doc.mail is the per-account list, carried for whoever builds that door.
+    mail: mailList,
+    mailLine: mailLine(totals, mailList),
     moreUnread: Math.max(0, number(totals.unread, 0) - listed),
     moreNotifications: Math.max(0, number(totals.notifications, 0) - ((usable && doc.notifications) || []).length)
   }
+}
+
+// mailLine is the one place mail appears. It is a sentence rather than a row
+// because every row in this popup runs a command on enter, and a mail row
+// could not: there is no mail client on this desktop and no web mailbox on the
+// server, because posta is the phone's. It is a line of its own rather than a
+// fifth count in the hero because the hero elides — four counts already clip
+// "1 due today" there, so a fifth would be written and never read.
+//
+// Naming the account is the part a bare number cannot do, and the part that
+// earns the line.
+function mailLine(totals, mail) {
+  var unread = number(totals && totals.mail, 0)
+  if (unread <= 0) return ""
+  // "mail" is uncountable, so there is no plural to get wrong.
+  var boxes = []
+  for (var i = 0; i < mail.length; i++) {
+    if (number(mail[i].unread, 0) > 0) boxes.push(String(mail[i].name || mail[i].address || ""))
+  }
+  if (boxes.length === 1) return unread + " unread mail in " + boxes[0]
+  if (boxes.length > 1) return unread + " unread mail across " + boxes.length + " accounts"
+  // A count with no list behind it: the daemon capped the list, or a reader is
+  // holding a document older than its totals. Say the number and stop.
+  return unread + " unread mail"
 }
 
 // badge is what fits in a bar. Zero draws nothing rather than a "0", and past
@@ -382,6 +416,7 @@ if (typeof module !== "undefined") {
     badge: badge,
     channelLabel: channelLabel,
     notificationLine: notificationLine,
+    mailLine: mailLine,
     agoLabel: agoLabel,
     ageSeconds: ageSeconds,
     staleLimit: staleLimit,

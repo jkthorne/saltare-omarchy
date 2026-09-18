@@ -182,6 +182,20 @@ Panel {
             fontFamily: root.fontFamily
           }
 
+          // Mail is here rather than in the hero's summary because the hero
+          // elides: four counts already clip "1 due today" to "1 due toda…"
+          // at this width, so a fifth would be invisible. A line of its own
+          // wraps, and has room to say which inbox it means.
+          Text {
+            width: parent.width
+            visible: root.view.state === "ok" && root.view.mailLine !== ""
+            text: root.view.mailLine
+            wrapMode: Text.WordWrap
+            color: root.dim
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.bodySmall
+          }
+
           // The explanation for every state that is not "ok". It names the
           // command that ends the state, because a screen that describes a
           // problem without naming its fix is a dead end.

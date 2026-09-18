@@ -1,14 +1,16 @@
 # saltare.workspace
 
 An [Omarchy](https://omarchy.org) plugin for a [Saltare](https://saltare.ai)
-workspace. A bar widget — unread channels, the mentions waiting for you, and
-what is due today; click a row and you land in it. And a capture field on a
-keystroke, which decides for itself where what you typed should go.
+workspace. A bar widget — unread channels, the mentions waiting for you, what
+is due today, and how much mail is unread; click a row and you land in it. And
+a capture field on a keystroke, which decides for itself where what you typed
+should go.
 
 ```
 ◈ 13
 ┌─────────────────────────────────────┐
 │ Acme      13 unread · 1 mention · … │
+│ 4 unread mail in Ada Lovelace       │
 │ MENTIONS                            │
 │   Alice Chen mentioned you in       │
 │   #general                          │
@@ -77,6 +79,25 @@ Two of those are deliberate. **A stopped watcher keeps its last counts**
 rather than dropping to zero: a bar that blanks when its feed dies has told
 you something false. And **sign-in outranks a stale file**, because restarting
 a watcher that has nothing to sign in with fixes nothing.
+
+## Mail
+
+The count comes from the workspace's own mailbox — the one
+[posta](https://github.com/jkthorne/posta) reads on the phone — so the widget
+needs nothing new to show it.
+
+It is a line and not a section, and that is the design rather than an
+oversight. **Every row in the popup runs a command on enter**, and a mail row
+could not: there is no mail client on this desktop and no web mailbox on the
+server. A section of rows that open nothing is a door painted on a wall. It is
+also not a fifth count in the header, because four already elide `1 due today`
+to `1 due toda…` at that width; a line of its own has room to name the account,
+which is the part a bare number cannot do.
+
+**It can be missing, and that is fine.** Mail needs the `mail:read` scope,
+which joined the CLI grant after most sessions were minted — and a session
+keeps the scopes it was born with. If yours predates it, the line is simply
+absent and everything else is unaffected. `sal login` again if you want it.
 
 ## Capture
 

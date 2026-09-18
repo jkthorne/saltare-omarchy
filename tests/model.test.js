@@ -434,3 +434,67 @@ test("the bar widget root has an implicit size, or the bar gives it no room", ()
   // And it must collapse when hidden, or showWhenIdle:false leaves a gap.
   assert.match(source, /implicitWidth:\s*button\.visible\s*\?/)
 })
+
+test("the mail count reaches the view, counted from the inbox the daemon picked", () => {
+  const view = Model.view(loaded(), publishedAt, settings, true)
+  // The golden has three unread in Trash and two in the inbox. Two is the
+  // answer; a reader that summed folders would say five.
+  assert.equal(view.totals.mail, 2)
+  assert.equal(view.mail.length, 1)
+  assert.equal(view.mail[0].name, "Ada Lovelace")
+})
+
+test("mail adds no rows, because a row that opens nothing is a door painted on a wall", () => {
+  // Every row in this popup runs a command. There is no desktop mail client to
+  // open one in and no web mailbox on the server, so mail stays a count in the
+  // summary line rather than becoming the one section you cannot act on.
+  const view = Model.view(loaded(), publishedAt, settings, true)
+  const headings = Model.rows(view).map((r) => r.section).filter((s) => s !== "")
+  assert.deepEqual(headings, ["MENTIONS", "UNREAD", "WORK"])
+})
+
+test("a session that cannot see mail is not a session with an empty inbox", () => {
+  // The daemon sends null, not [], for a reader without mail:read. Neither
+  // draws anything, but the document keeps the two apart.
+  const doc = JSON.parse(fixture)
+  doc.mail = null
+  doc.totals.mail = 0
+  const view = Model.view(Model.parse(JSON.stringify(doc)), publishedAt, settings, true)
+  assert.deepEqual(view.mail, [])
+  assert.equal(view.totals.mail, 0)
+})
+
+test("the mail line names the account, which is the part a bare number cannot", () => {
+  const view = Model.view(loaded(), publishedAt, settings, true)
+  assert.equal(view.mailLine, "2 unread mail in Ada Lovelace")
+})
+
+test("two accounts are counted, not listed", () => {
+  const line = Model.mailLine({ mail: 7 }, [
+    { name: "Ada Lovelace", unread: 4 },
+    { name: "Work", unread: 3 },
+    { name: "Quiet", unread: 0 }
+  ])
+  assert.equal(line, "7 unread mail across 2 accounts")
+})
+
+test("a total with no list behind it still says the number", () => {
+  // The daemon caps the list at five mailboxes but keeps the total exact, so
+  // the two can legitimately disagree.
+  assert.equal(Model.mailLine({ mail: 3 }, []), "3 unread mail")
+})
+
+test("no mail is no line at all", () => {
+  assert.equal(Model.mailLine({ mail: 0 }, []), "")
+  assert.equal(Model.mailLine({}, []), "")
+  assert.equal(Model.view(Model.missing(), publishedAt, settings, true).mailLine, "")
+})
+
+test("the panel gives mail its own line, because the hero elides", () => {
+  // Four counts already clip "1 due today" to "1 due toda\u2026" at this width. A
+  // fifth would be written and never read.
+  const source = fs.readFileSync(path.join(__dirname, "..", "Panel.qml"), "utf8")
+  assert.match(source, /text: root\.view\.mailLine/)
+  assert.ok(!/summaryLine[\s\S]*totals\.mail/.test(source),
+    "the hero summary must not carry a count it will elide")
+})
