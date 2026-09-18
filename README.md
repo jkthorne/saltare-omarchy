@@ -82,9 +82,8 @@ a watcher that has nothing to sign in with fixes nothing.
 
 ## Mail
 
-The count comes from the workspace's own mailbox — the one
-[posta](https://github.com/jkthorne/posta) reads on the phone — so the widget
-needs nothing new to show it.
+The count comes from the workspace's own mailbox — the one posta reads on the
+phone — so the widget needs nothing new to show it.
 
 It is a line and not a section, and that is the design rather than an
 oversight. **Every row in the popup runs a command on enter**, and a mail row
