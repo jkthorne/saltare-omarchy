@@ -12,6 +12,12 @@ name: CI
 # Omarchy, and the golden comparison needs saltare-cli checked out beside this
 # repo. Both are gates the workstation run does hold, and both say so in the
 # summary rather than reading as passes.
+#
+# Note, 2026-09-18: GitHub registers a workflow when a push *touches the file*,
+# and until this line landed it had never registered this one — the repo's
+# `workflow_dispatch` existed on master and `bin/ci --remote` answered
+# "workflow ci.yml not found". If a new repo's remote gate 404s, push a change
+# to this file rather than looking for the fault in the YAML.
 on:
   workflow_dispatch:
     inputs:
