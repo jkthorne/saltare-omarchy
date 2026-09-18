@@ -28,11 +28,17 @@ Item {
   property bool asking: false
   property string errorText: ""
 
+  // A streaming command's stderr is not an error until it exits saying so.
+  // `sal search` prints "no results" there and exits 0, and painting that red
+  // would be the overlay calling a search that worked a failure.
+  property string streamNotice: ""
+
   readonly property var routed: Capture.route(field.text)
   readonly property bool streaming: answer.text !== "" || asking
 
   function open(payloadJson) {
     errorText = ""
+    streamNotice = ""
     answer.text = ""
     opened = true
     Qt.callLater(function() { field.forceActiveFocus() })
@@ -46,6 +52,7 @@ Item {
     field.text = ""
     answer.text = ""
     errorText = ""
+    streamNotice = ""
   }
 
   function dismiss() {
@@ -60,6 +67,7 @@ Item {
     if (Capture.streams(action)) {
       answer.text = ""
       errorText = ""
+      streamNotice = ""
       asking = true
       askProcess.command = ["sh", "-c", action.command]
       askProcess.running = true
@@ -67,6 +75,13 @@ Item {
     }
     runProcess.command = ["sh", "-c", action.command]
     runProcess.running = true
+  }
+
+  // say appends one line to the pane, which is also how the stdout parser
+  // fills it — one definition of "what a line looks like in there".
+  function say(line) {
+    if (!line) return
+    answer.text += (answer.text === "" ? "" : "\n") + line
   }
 
   function stopAsking() {
@@ -91,12 +106,14 @@ Item {
     id: askProcess
     running: false
     stdout: SplitParser {
-      onRead: function(line) { answer.text += (answer.text === "" ? "" : "\n") + String(line) }
+      onRead: function(line) { root.say(String(line)) }
     }
-    stderr: SplitParser { onRead: function(line) { root.errorText = String(line).trim() } }
+    stderr: SplitParser { onRead: function(line) { root.streamNotice = String(line).trim() } }
     onExited: function(exitCode) {
       root.asking = false
-      if (exitCode !== 0 && root.errorText === "") root.errorText = "sal exited " + exitCode
+      if (exitCode === 0) root.say(root.streamNotice)
+      else root.errorText = root.streamNotice !== "" ? root.streamNotice : "sal exited " + exitCode
+      root.streamNotice = ""
     }
   }
 

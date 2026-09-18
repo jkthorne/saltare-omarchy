@@ -92,6 +92,22 @@ function route(input) {
     }
   }
 
+  // ?query — find it. The one sigil that pulls rather than pushes, and the
+  // reason there is no bar widget for notes, files or photos: `sal search`
+  // already spans messages, tasks, documents and uploads, which is every
+  // Tier 2 domain the phone gives its own app. The results land in the same
+  // pane an answer does, so the field that captures a thought also finds one.
+  if (text.charAt(0) === "?") {
+    var query = text.slice(1).trim()
+    if (query === "") return null
+    return {
+      kind: "search",
+      summary: "Search for " + query,
+      target: query,
+      command: "sal search " + quote(query)
+    }
+  }
+
   // Anything else is a question. This is the default on purpose: the common
   // case for a field you summoned with a keystroke is a thought, and making
   // the common case the one with no sigil is what makes the sigils worth
@@ -105,16 +121,17 @@ function route(input) {
 }
 
 // streams reports whether the action answers in the overlay rather than
-// finishing silently. Only `ask` does; everything else lands in the workspace
-// and the overlay's job is to get out of the way.
+// finishing silently. Asking and searching do — both are questions, and the
+// answer is the point. Everything else lands in the workspace and the
+// overlay's job is to get out of the way.
 function streams(routed) {
-  return !!routed && routed.kind === "ask"
+  return !!routed && (routed.kind === "ask" || routed.kind === "search")
 }
 
 // hint is what the field shows before anything is typed. It teaches the
 // grammar by listing it, which is cheaper than documentation nobody opens.
 function hint() {
-  return "#channel · @agent · !task · /doc · or just ask"
+  return "#channel · @agent · !task · /doc · ?find · or just ask"
 }
 
 function firstWord(text) {

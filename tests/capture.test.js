@@ -49,6 +49,18 @@ test("something that only looks like a date stays in the title", () => {
   assert.equal(routed.command, "sal tasks add '2026 planning'")
 })
 
+test("?query searches every pull surface at once", () => {
+  const routed = Capture.route("?the receipt from March")
+  assert.equal(routed.kind, "search")
+  assert.equal(routed.target, "the receipt from March")
+  assert.equal(routed.command, "sal search 'the receipt from March'")
+  assert.equal(routed.summary, "Search for the receipt from March")
+})
+
+test("a search answers in the overlay, because the results are the point", () => {
+  assert.equal(Capture.streams(Capture.route("?deploy")), true)
+})
+
 test("anything without a sigil is a question, because that is the common case", () => {
   const routed = Capture.route("what broke the deploy last night")
   assert.equal(routed.kind, "ask")
@@ -56,14 +68,14 @@ test("anything without a sigil is a question, because that is the common case", 
   assert.equal(Capture.streams(routed), true)
 })
 
-test("only asking streams back into the overlay", () => {
+test("only the two questions stream back; every send gets out of the way", () => {
   for (const input of ["#general hi", "@scout hi", "!a thing", "/doc a doc"]) {
     assert.equal(Capture.streams(Capture.route(input)), false, input)
   }
 })
 
 test("a sigil with nothing after it is not an action", () => {
-  for (const input of ["", "   ", "#general", "#general   ", "@scout", "!", "!   ", "/doc"]) {
+  for (const input of ["", "   ", "#general", "#general   ", "@scout", "!", "!   ", "/doc", "?", "?  "]) {
     assert.equal(Capture.route(input), null, JSON.stringify(input))
   }
 })
@@ -87,7 +99,7 @@ test("everything that reaches a shell is quoted", () => {
 
 test("the hint teaches the grammar it implements", () => {
   const hint = Capture.hint()
-  for (const sigil of ["#", "@", "!", "/doc"]) {
+  for (const sigil of ["#", "@", "!", "/doc", "?"]) {
     assert.ok(hint.includes(sigil), "hint omits " + sigil)
   }
 })
@@ -99,8 +111,16 @@ test("the overlay holds no session and issues no request", () => {
   }
   // And it builds no command by hand — Capture.js is the only place that does.
   // Named subcommands only: "sal exited 3" is an error message, not an argv.
-  assert.ok(!/"sal (send|ask|tasks|docs|agents|open|status|watch)\b/.test(source),
+  assert.ok(!/"sal (send|ask|search|tasks|docs|agents|open|status|watch)\b/.test(source),
     "Capture.qml is assembling a command instead of asking Capture.js")
+})
+
+test("a search that found nothing is not an error", () => {
+  // `sal search` says "no results" on stderr and exits 0. The overlay has to
+  // read the exit code before it decides that red is the right colour.
+  const source = fs.readFileSync(path.join(__dirname, "..", "Capture.qml"), "utf8")
+  assert.match(source, /stderr: SplitParser \{ onRead: function\(line\) \{ root\.streamNotice/)
+  assert.match(source, /if \(exitCode === 0\) root\.say\(root\.streamNotice\)/)
 })
 
 test("the overlay answers the shell's summon contract", () => {
