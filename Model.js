@@ -213,8 +213,15 @@ function view(snapshot, nowMs, settings, salPresent) {
     // A bar widget that draws nothing when there is nothing to say is the one
     // people keep. showWhenIdle defaults on, because someone who just
     // installed this deserves to see that it worked.
+    //
+    // "Waiting" is the four counts you would act on today. Mail is not among
+    // them on purpose: it is a line rather than a section for the same reason
+    // — nothing in this popup opens it — and an unread message can sit in a
+    // mailbox for a month, which would pin the widget on and make the setting
+    // mean nothing.
     visible: name !== "ok" || totals.unread > 0 || totals.mentions > 0
-      || totals.overdue > 0 || bool(settings && settings.showWhenIdle, true),
+      || totals.overdue > 0 || totals.due_today > 0
+      || bool(settings && settings.showWhenIdle, true),
     // Stale counts are shown struck through rather than blanked: a bar that
     // drops to zero when its feed dies has told you something false.
     stale: name === "stopped",

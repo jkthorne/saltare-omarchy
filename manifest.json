@@ -43,7 +43,7 @@
         "type": "boolean",
         "label": "Show with nothing waiting",
         "defaultValue": true,
-        "description": "Off hides the widget until something is unread."
+        "description": "Off hides the widget until something is unread, mentioning you, overdue or due today."
       },
       {
         "key": "staleAfterSec",

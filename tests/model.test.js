@@ -186,6 +186,24 @@ test("showWhenIdle off hides a widget with nothing to say, and never hides one w
   assert.equal(Model.view(idle, publishedAt, { showWhenIdle: false }, true).visible, false)
   assert.equal(Model.view(idle, publishedAt, { showWhenIdle: true }, true).visible, true)
   assert.equal(Model.view(loaded(), publishedAt, { showWhenIdle: false }, true).visible, true)
+
+  // Each of the four counts on its own is enough to show it.
+  for (const count of ["unread", "mentions", "overdue", "due_today"]) {
+    const only = Model.parse(JSON.stringify(Object.assign({}, doc, {
+      totals: Object.assign({ unread: 0, mentions: 0, notifications: 0, overdue: 0,
+                              due_today: 0, mail: 0 }, { [count]: 1 }),
+    })))
+    assert.equal(Model.view(only, publishedAt, { showWhenIdle: false }, true).visible, true,
+      count + " alone should show the widget")
+  }
+
+  // Mail is not one of them: nothing in the popup opens it, and an unread
+  // message can sit in a mailbox for a month — which would leave the setting
+  // meaning nothing at all.
+  const mailOnly = Model.parse(JSON.stringify(Object.assign({}, doc, {
+    totals: { unread: 0, mentions: 0, notifications: 0, overdue: 0, due_today: 0, mail: 4 },
+  })))
+  assert.equal(Model.view(mailOnly, publishedAt, { showWhenIdle: false }, true).visible, false)
   // A state that needs a human is never hidden, whatever the setting says.
   assert.equal(Model.view(Model.missing(), publishedAt, { showWhenIdle: false }, false).visible, true)
 })

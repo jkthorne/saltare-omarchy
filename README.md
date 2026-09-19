@@ -151,7 +151,7 @@ Setup → Plugins → Saltare, or by hand in `~/.config/omarchy/shell.json`.
 | Key | Default | What |
 |---|---|---|
 | `statePath` | `$XDG_STATE_HOME/saltare/watch.json` | where the daemon publishes |
-| `showWhenIdle` | `true` | off hides the widget until something is waiting |
+| `showWhenIdle` | `true` | off hides the widget until something is unread, mentioning you, overdue or due today |
 | `staleAfterSec` | `120` | how long before a quiet watcher counts as a stopped one |
 
 ## Without Omarchy
