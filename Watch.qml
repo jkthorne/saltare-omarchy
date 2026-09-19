@@ -70,6 +70,19 @@ Item {
     onTriggered: root.nowMs = Date.now()
   }
 
+  // A watcher can only watch a directory that exists, and
+  // $XDG_STATE_HOME/saltare/ does not until `sal watch` first runs. So on a
+  // fresh machine the file appearing is the one change inotify cannot report,
+  // and without this the widget's own Sign in and Start the watcher buttons
+  // launch the command that ends the state and then sit on the same screen
+  // until the shell is restarted. Poll until something loads, then stop.
+  Timer {
+    interval: 5000
+    running: root.snapshot.status !== "loaded"
+    repeat: true
+    onTriggered: file.reload()
+  }
+
   function recheck() {
     probe.running = true
     file.reload()

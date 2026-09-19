@@ -323,6 +323,16 @@ test("the data layer watches a file and nothing else — no socket, no token, no
   }
 })
 
+test("the file appearing for the first time is the change inotify cannot report", () => {
+  const source = qml("Watch.qml")
+  // $XDG_STATE_HOME/saltare/ does not exist until `sal watch` first runs, and
+  // a watcher cannot watch a directory that is not there. Confirmed against a
+  // live Quickshell: a file created in an existing directory is seen, and one
+  // whose directory arrives with it is not, ever.
+  assert.match(source, /running:\s*root\.snapshot\.status\s*!==\s*"loaded"/)
+  assert.match(source, /onTriggered:\s*file\.reload\(\)/)
+})
+
 test("nothing in the plugin carries a credential or calls the API directly", () => {
   for (const name of ["Watch.qml", "Panel.qml", "Model.js"]) {
     const source = qml(name)
