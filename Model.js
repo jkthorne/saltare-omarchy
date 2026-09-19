@@ -203,8 +203,9 @@ function view(snapshot, nowMs, settings, salPresent) {
     && name !== "unreadable" && name !== "probing" && doc
   var totals = (usable && doc.totals) || { unread: 0, mentions: 0, notifications: 0, overdue: 0, due_today: 0, mail: 0 }
 
-  var mailList = (usable && doc.mail) || []
-  var channels = (usable && doc.channels) || []
+  var mailList = list(usable && doc.mail)
+  var channels = list(usable && doc.channels).filter(isObject)
+  var work = (usable && doc.work) || null
   var listed = 0
   for (var i = 0; i < channels.length; i++) listed += number(channels[i].unread, 0)
 
@@ -235,8 +236,8 @@ function view(snapshot, nowMs, settings, salPresent) {
     age: usable ? agoLabel(doc, nowMs) : "",
     totals: totals,
     channels: channels.map(decorateChannel),
-    notifications: (usable && doc.notifications) || [],
-    work: (usable && doc.work) || { overdue: [], today: [] },
+    notifications: list(usable && doc.notifications).filter(isObject),
+    work: { overdue: list(work && work.overdue), today: list(work && work.today) },
     // Mail is a number in the summary line and nothing more, and the reason is
     // the invariant one row below: every row in this popup knows the command
     // its enter key runs. A mail row could not — there is no mail client on
@@ -247,7 +248,7 @@ function view(snapshot, nowMs, settings, salPresent) {
     mail: mailList,
     mailLine: mailLine(totals, mailList),
     moreUnread: Math.max(0, number(totals.unread, 0) - listed),
-    moreNotifications: Math.max(0, number(totals.notifications, 0) - ((usable && doc.notifications) || []).length)
+    moreNotifications: Math.max(0, number(totals.notifications, 0) - list(usable && doc.notifications).length)
   }
 }
 
@@ -265,8 +266,11 @@ function mailLine(totals, mail) {
   if (unread <= 0) return ""
   // "mail" is uncountable, so there is no plural to get wrong.
   var boxes = []
-  for (var i = 0; i < mail.length; i++) {
-    if (number(mail[i].unread, 0) > 0) boxes.push(String(mail[i].name || mail[i].address || ""))
+  var accounts = list(mail).filter(isObject)
+  for (var i = 0; i < accounts.length; i++) {
+    if (number(accounts[i].unread, 0) > 0) {
+      boxes.push(String(accounts[i].name || accounts[i].address || ""))
+    }
   }
   if (boxes.length === 1) return unread + " unread mail in " + boxes[0]
   if (boxes.length > 1) return unread + " unread mail across " + boxes.length + " accounts"
@@ -413,6 +417,18 @@ function shellQuote(value) {
   return "'" + String(value).replace(/'/g, "'\\''") + "'"
 }
 
+// list and isObject are the same argument number() and bool() make. The
+// document is a seam between two repos that release separately, and a field
+// that arrives as the wrong shape should draw nothing — `[].concat(undefined)`
+// is `[undefined]`, and the line after it reads .title off it inside a bar.
+function list(value) {
+  return Array.isArray(value) ? value : []
+}
+
+function isObject(value) {
+  return !!value && typeof value === "object"
+}
+
 function number(value, fallback) {
   var n = Number(value)
   return isFinite(n) ? n : fallback
@@ -443,6 +459,7 @@ if (typeof module !== "undefined") {
     fixFor: fixFor,
     openCommand: openCommand,
     completeCommand: completeCommand,
-    shellQuote: shellQuote
+    shellQuote: shellQuote,
+    list: list
   }
 }

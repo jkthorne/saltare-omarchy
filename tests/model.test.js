@@ -219,6 +219,29 @@ test("caps are visible: totals disagree with the list and the widget says by how
   assert.equal(view.moreNotifications, 8)
 })
 
+test("a document missing half its shape draws nothing rather than throwing", () => {
+  // The fixture is byte-identical to the daemon's golden, so today these
+  // cannot happen. The two repos release separately, and the place this would
+  // land is inside a bar, where a TypeError is a widget that stops painting
+  // with no error anyone will see. `[].concat(undefined)` is `[undefined]`,
+  // and the line after it read .title off it.
+  const partial = Model.parse(JSON.stringify(Object.assign({}, doc, {
+    work: { overdue: [{ slug: "a", title: "A", due_date: "2026-09-14" }] }, // no today
+    channels: [null, { slug: "b", title: "b", kind: "public_channel", unread: 2 }],
+    notifications: null,
+    mail: "not a list",
+  })))
+  const view = Model.view(partial, publishedAt, settings, true)
+  assert.equal(view.state, "ok")
+  assert.deepEqual(view.work.today, [])
+  assert.equal(view.channels.length, 1)
+  assert.deepEqual(view.notifications, [])
+  assert.deepEqual(view.mail, [])
+  const rows = Model.rows(view)
+  assert.deepEqual(rows.map((r) => r.kind), ["channel", "task"])
+  assert.equal(rows[1].label, "A")
+})
+
 test("the sigil goes back on here, because the daemon sends a bare title on purpose", () => {
   // The kinds are the server's enum, not a guess. Guessing produced
   // "#DevOps Monitor" in a live bar: agent DMs are `agent_dm`, never `dm`.
