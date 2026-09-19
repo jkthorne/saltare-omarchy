@@ -65,20 +65,30 @@ missing and the command that completes it.
 
 ## What it shows when something is wrong
 
-Every state names the command that ends it.
+Every state but one names the command that ends it. In precedence order, which
+is the order they are decided in:
 
 | State | What happened | What it says |
 |---|---|---|
+| probing | the lookup for `sal` hasn't returned | Checking — the frame or two it takes, and no fix, because there is nothing yet to fix |
 | setup | `sal` isn't installed | Install the CLI, then reload the shell |
+| unsupported | the file came from a newer `sal` than this | Update the plugin |
+| unreadable | the file is there and will not parse | The parser's own reason, and `sal watch --once` to rewrite it |
 | signin | no session, or the session expired | Sign in — opens a terminal on `sal login` |
 | stopped | the watcher isn't running | Start it — the last counts stay on screen, struck through |
+| blocked | the server answered, and refused | The server's own sentence, and `sal doctor` |
 | offline | the server is unreachable | Names the server and how old the numbers are |
 | ok | — | the workspace |
 
-Two of those are deliberate. **A stopped watcher keeps its last counts**
-rather than dropping to zero: a bar that blanks when its feed dies has told
-you something false. And **sign-in outranks a stale file**, because restarting
-a watcher that has nothing to sign in with fixes nothing.
+Four of those are the order arguing with itself. **A stopped watcher keeps its
+last counts** rather than dropping to zero: a bar that blanks when its feed
+dies has told you something false. **Sign-in outranks a stale file**, because
+restarting a watcher that has nothing to sign in with fixes nothing. **A server
+that answered and refused is blocked, not offline** — saying offline there
+sends you to check a connection that was never the problem, which is exactly
+what the daemon's first live run did against a workspace at its monthly cap.
+And **a file that will not parse is not a missing session**, so it stopped
+offering `sal login`, which could not have repaired it.
 
 ## Mail
 
@@ -152,7 +162,7 @@ Setup → Plugins → Saltare, or by hand in `~/.config/omarchy/shell.json`.
 |---|---|---|
 | `statePath` | `$XDG_STATE_HOME/saltare/watch.json` | where the daemon publishes |
 | `showWhenIdle` | `true` | off hides the widget until something is unread, mentioning you, overdue or due today |
-| `staleAfterSec` | `120` | how long before a quiet watcher counts as a stopped one |
+| `staleAfterSec` | `0` | how long before a quiet watcher counts as a stopped one — 0 follows the daemon's own heartbeat, three missed beats, the rule `sal status` uses |
 
 ## Without Omarchy
 
@@ -163,9 +173,13 @@ prompt. Neither needs this plugin.
 ## Hacking
 
 ```sh
-node --test tests/model.test.js    # all of the logic
-omarchy plugin validate .          # the manifest
+bin/ci                          # the gate — everything this machine can run
+node --test tests/*.test.js     # just the logic
+omarchy plugin validate .       # just the manifest
 ```
+
+There are two test files; `tests/model.test.js` alone leaves the capture
+grammar unrun.
 
 ### Seeing every state without breaking anything
 
@@ -179,10 +193,12 @@ bin/demo-states --all          # ↵ between states, watch the bar
 omarchy bar set saltare.workspace statePath ""
 ```
 
-`bin/demo-states --list` names each one and what you should see. Walk them
+`bin/demo-states --list` names each one and what you should see. Walk the list
 before shipping a change: the states nobody exercises are the ones that rot,
 and `probing` only exists because running it once showed the widget telling a
-machine with `sal` installed to go and install it.
+machine with `sal` installed to go and install it. Seven of the nine states in
+the table above are reachable this way; `setup` and `probing` are about the CLI
+rather than the file, so they are not.
 
 `Model.js` holds every decision — which state we are in, what the badge says,
 what each row runs — as pure functions, and the QML is a renderer over it.
@@ -203,10 +219,6 @@ Two things about the edit loop, both learned the hard way:
   cached compiled component here across several edits, reporting warnings
   against line numbers the file no longer had. When a change seems not to take,
   `omarchy-restart-shell` and trust that.
-
-The state table above is not decoration — walk all six states before shipping a
-change. `probing` exists because running it revealed the widget told a machine
-with `sal` installed to go and install it, for as long as the lookup took.
 
 ## License
 
