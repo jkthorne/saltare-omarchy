@@ -150,9 +150,13 @@ Panel {
       onActivateRequested: if (root.cursorActive) root.activate()
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
+      // `x` never arrives as text. PanelKeyCatcher spends it on deleteRequested
+      // and returns before it emits textKey, so the handler below is only ever
+      // reached by a letter the host did not already name a signal for. This
+      // list is completing a task, which is what delete means in this panel.
+      onDeleteRequested: if (root.cursorActive) root.completeSelected()
       onTextKey: function(t) {
         if (t === "r" || t === "R") watch.recheck()
-        else if (t === "x" || t === "X") root.completeSelected()
         else if (t === "o" || t === "O") { root.run("sal open"); root.close() }
       }
 

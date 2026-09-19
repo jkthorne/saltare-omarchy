@@ -352,6 +352,55 @@ test("every action the panel takes goes through a command the model built", () =
     "Panel.qml is building a command by hand instead of asking Model.js")
 })
 
+// The host's key catcher spends some letters on named signals and returns
+// before it emits textKey, so a plugin that waits for those letters as text
+// waits forever. `x` did: the README, the footer and completeSelected() all
+// agreed on a key that never arrived. Read the contract rather than restate it,
+// so the next letter Omarchy promotes fails here instead of in someone's bar.
+const catcherPath = path.join(
+  process.env.OMARCHY_PATH || "/usr/share/omarchy", "shell", "Ui", "PanelKeyCatcher.qml")
+
+// The body of `onFoo: function(...) { ... }`, brace-matched.
+function handlerBody(source, name) {
+  const at = source.indexOf(name + ":")
+  if (at === -1) return ""
+  const open = source.indexOf("{", at)
+  if (open === -1) return ""
+  let depth = 0
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === "{") depth++
+    else if (source[i] === "}" && --depth === 0) return source.slice(open + 1, i)
+  }
+  return ""
+}
+
+test("no key we wait for as text is one the host already spent on a signal", (t) => {
+  if (!fs.existsSync(catcherPath)) return t.skip("Omarchy is not installed here")
+  const catcher = fs.readFileSync(catcherPath, "utf8")
+  // From the key handler itself, not the signal declaration above it, down to
+  // the one emit that anything unclaimed falls through to.
+  const pressed = catcher.slice(catcher.indexOf("Keys.onPressed"))
+  const beforeTextKey = pressed.slice(0, pressed.indexOf("textKey("))
+  const spent = new Set(
+    [...beforeTextKey.matchAll(/event\.text\s*===\s*"(.)"/g)].map((m) => m[1].toLowerCase()))
+  assert.ok(spent.size > 0, "read no spent keys out of " + catcherPath)
+
+  const body = handlerBody(qml("Panel.qml"), "onTextKey")
+  assert.ok(body !== "", "found no onTextKey handler in Panel.qml")
+  for (const key of spent) {
+    assert.ok(!new RegExp('"' + key + '"', "i").test(body),
+      "Panel.qml waits for \"" + key + "\" in onTextKey, but PanelKeyCatcher spends it on a "
+      + "named signal first — it will never arrive")
+  }
+})
+
+test("x completes a task through the signal the host actually emits", () => {
+  const source = qml("Panel.qml")
+  assert.match(source, /onDeleteRequested:[^\n]*completeSelected\(\)/)
+  // The footer promises it, so the wiring above is what makes the promise true.
+  assert.match(source, /x complete/)
+})
+
 test("the manifest declares what the shell needs and what the settings pane shows", () => {
   const manifest = JSON.parse(qml("manifest.json"))
   assert.equal(manifest.schemaVersion, 1)
