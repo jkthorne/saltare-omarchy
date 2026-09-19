@@ -373,14 +373,16 @@ main() {
 }
 
 #
-# saltare-omarchy: an Omarchy shell plugin. QML plus one JavaScript file, and
-# the JavaScript is where every decision lives — so `node --test` is the gate,
-# not a formality.
+# saltare-omarchy: an Omarchy shell plugin. QML plus JavaScript, and the
+# JavaScript is where every decision lives — so `node --test` is the gate, not
+# a formality. The QML is checked too, because "every decision lives in the
+# JavaScript" was never the same claim as "nothing in the QML can be wrong".
 #
-# All of it is Linux. Two steps can still be unrunnable: `omarchy plugin
-# validate` needs Omarchy, and the cross-repo golden check needs saltare-cli
-# checked out beside this one. Both skip with a reason rather than passing
-# quietly, because a gap you can see is a gap you remember to close.
+# All of it is Linux. Three steps can still be unrunnable: `omarchy plugin
+# validate` and qmllint both want Omarchy on the machine, and the cross-repo
+# golden check wants saltare-cli checked out beside this one. All three skip
+# with a reason rather than passing quietly, because a gap you can see is a gap
+# you remember to close.
 
 CI_REPO=saltare-omarchy
 CI_TIERS="linux"
@@ -396,11 +398,58 @@ tier_linux() {
     skip "Manifest" "omarchy is not installed here"
   fi
 
+  if [ ! -d "${OMARCHY_PATH:-/usr/share/omarchy}/shell" ]; then
+    skip "QML" "omarchy's shell modules are not on this machine"
+  elif ! qmllint_bin >/dev/null 2>&1; then
+    skip "QML" "qmllint is not installed (qt6-declarative)"
+  else
+    step "QML" qml_lint
+  fi
+
   if [ -f ../saltare-cli/internal/watch/testdata/golden.json ]; then
     step "Golden matches the daemon" golden_matches
   else
     skip "Golden matches the daemon" "saltare-cli is not checked out beside this repo"
   fi
+}
+
+# qmllint, with Omarchy's own qs.* modules resolvable.
+#
+# The JavaScript has had node --check and the test suite since the first
+# commit. The QML — the larger half of this plugin, and the whole of the half
+# that talks to the host — had nothing checking it at all.
+#
+# The shell's modules are qs.Ui and qs.Commons and they live under
+# $OMARCHY_PATH/shell, so the import path needs a directory named `qs` pointing
+# at it: one symlink in a temp dir, and nothing installed is touched.
+qmllint_bin() {
+  command -v qmllint && return 0
+  [ -x /usr/lib/qt6/bin/qmllint ] && { echo /usr/lib/qt6/bin/qmllint; return 0; }
+  return 1
+}
+
+# Four categories are off, and all four are about how Quickshell registers its
+# types rather than about this code: the host hands a plugin its bar as a bare
+# QtObject and its Style tokens as plain vars, so every member read through
+# either is unresolvable here; a nested Component reaching an outer id is
+# reported as unqualified though QML resolves it; PanelWindow is created by
+# Quickshell rather than by QML; and Process.exited carries a C++ enum qmllint
+# cannot see. What is left is real.
+qml_lint() {
+  local bin shell tmp rc=0
+  bin=$(qmllint_bin) || { echo "qmllint is not installed (qt6-declarative)" >&2; return 1; }
+
+  shell=${OMARCHY_PATH:-/usr/share/omarchy}/shell
+  [ -d "$shell" ] || { echo "no Omarchy shell modules at $shell" >&2; return 1; }
+
+  tmp=$(mktemp -d) || return 1
+  ln -s "$shell" "$tmp/qs"
+  "$bin" -I "$tmp" \
+    --missing-property disable --unqualified disable \
+    --signal-handler-parameters disable --uncreatable-type disable \
+    ./*.qml || rc=1
+  rm -rf "$tmp"
+  return $rc
 }
 
 # Every test file, named explicitly. `node --test tests/` walks the directory
