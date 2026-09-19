@@ -68,8 +68,8 @@ var MISSED_BEATS = 3
 //
 //   setup outranks everything, because no CLI means no instruction below it
 //   can be followed.
-//   unsupported comes next: a document we cannot read is one whose `state`
-//   field we have no right to trust either.
+//   unsupported and unreadable come next: a document we cannot read is one
+//   whose `state` field we have no right to trust either.
 //   signin outranks stopped, because restarting a watcher that has nothing to
 //   sign in with fixes nothing.
 //   stopped outranks offline, because a dead watcher explains a dropped
@@ -88,6 +88,11 @@ function state(snapshot, nowMs, settings, salPresent) {
   if (!loaded && salPresent === undefined) return "probing"
   if (!loaded && !salPresent) return "setup"
   if (snapshot && snapshot.status === "unsupported") return "unsupported"
+  // A file that is there and will not parse is not a missing session, and
+  // telling someone to sign in is a fix that cannot work. The daemon renames a
+  // temp sibling into place so this should only ever be a frame long — but a
+  // write that ran out of disk, or a file edited by hand, stays this way.
+  if (snapshot && snapshot.status === "unreadable") return "unreadable"
   if (!loaded) return "signin"
   if (doc.state === "logged-out") return "signin"
   if (isStale(doc, nowMs, settings)) return "stopped"
@@ -153,12 +158,16 @@ function fixFor(name) {
       run: "omarchy-launch-tui omarchy plugin update saltare.workspace",
       hint: ""
     }
+  case "unreadable":
+    // Nothing here can repair the file; the daemon is the only thing that
+    // writes it, so the fix is to make it write a whole one.
+    return { label: "Rewrite the state file", run: "sal watch --once", hint: "" }
   default:
     return null
   }
 }
 
-function detailFor(name, doc, nowMs) {
+function detailFor(name, doc, nowMs, error) {
   switch (name) {
   case "probing":
     return "Looking for the sal CLI…"
@@ -177,6 +186,10 @@ function detailFor(name, doc, nowMs) {
     return (doc && doc.error) ? String(doc.error) : "The server refused the request."
   case "unsupported":
     return "This state file was written by a newer sal than this plugin understands."
+  case "unreadable":
+    // The parser's own sentence. It is the difference between "something is
+    // wrong with a file" and knowing which file, at which byte.
+    return "The state file did not parse" + (error ? " — " + error : "") + "."
   default:
     return ""
   }
@@ -187,7 +200,7 @@ function view(snapshot, nowMs, settings, salPresent) {
   var name = state(snapshot, nowMs, settings, salPresent)
   var doc = (snapshot && snapshot.doc) || null
   var usable = name !== "setup" && name !== "signin" && name !== "unsupported"
-    && name !== "probing" && doc
+    && name !== "unreadable" && name !== "probing" && doc
   var totals = (usable && doc.totals) || { unread: 0, mentions: 0, notifications: 0, overdue: 0, due_today: 0, mail: 0 }
 
   var mailList = (usable && doc.mail) || []
@@ -210,7 +223,7 @@ function view(snapshot, nowMs, settings, salPresent) {
     urgent: number(totals.mentions, 0) > 0 && (name === "ok" || name === "offline" || name === "blocked"),
     workspace: (usable && doc.workspace && doc.workspace.name) || "Saltare",
     server: (doc && doc.server) || "",
-    detail: detailFor(name, doc, nowMs),
+    detail: detailFor(name, doc, nowMs, (snapshot && snapshot.error) || ""),
     fix: fixFor(name),
     age: usable ? agoLabel(doc, nowMs) : "",
     totals: totals,
@@ -324,7 +337,7 @@ function agoLabel(doc, nowMs) {
 function rows(v) {
   var out = []
   if (!v || v.state === "setup" || v.state === "signin" || v.state === "unsupported"
-      || v.state === "probing") {
+      || v.state === "unreadable" || v.state === "probing") {
     if (v && v.fix && v.fix.run !== "") {
       out.push({ kind: "fix", section: "", label: v.fix.label, sub: "", command: v.fix.run })
     }

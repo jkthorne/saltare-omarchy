@@ -39,10 +39,20 @@ test("a document from a newer sal is refused rather than half-drawn", () => {
 test("a file caught mid-rename is a state, not an exception", () => {
   const snapshot = Model.parse('{"schema": 1, "totals"')
   assert.equal(snapshot.status, "unreadable")
-  assert.equal(Model.state(snapshot, publishedAt, settings, true), "signin")
+  // Not "signin", which is what it used to say: a file that is there and will
+  // not parse is not a missing session, and signing in again repairs nothing.
+  // The rename makes this a frame long in practice — a write that ran out of
+  // disk, or a hand-edited file, is where it stops being transient.
+  assert.equal(Model.state(snapshot, publishedAt, settings, true), "unreadable")
+  const view = Model.view(snapshot, publishedAt, settings, true)
+  assert.match(view.detail, /did not parse/)
+  assert.match(view.detail, /JSON|Unexpected|Expected/) // the parser's own words
+  assert.match(view.fix.run, /sal watch --once/)
+  assert.equal(view.badge, "")
+  assert.equal(Model.rows(view).length, 1)
 })
 
-// ── the five states ─────────────────────────────────────────────────────
+// ── the states ──────────────────────────────────────────────────────────
 
 test("before the CLI lookup returns, the widget says it is checking rather than guessing", () => {
   // Found by running it: the lookup is an async process launch, so the first
@@ -139,7 +149,10 @@ test("fresh and live is ok, with no fix to offer", () => {
 })
 
 test("every state that is not ok names its own fix", () => {
-  for (const name of ["setup", "signin", "stopped", "offline", "unsupported"]) {
+  // Every state but "ok", which has nothing to fix, and "probing", which is
+  // over before anyone could act on it.
+  for (const name of ["setup", "signin", "stopped", "offline", "blocked",
+                      "unsupported", "unreadable"]) {
     const fix = Model.fixFor(name)
     assert.ok(fix, name + " has no fix")
     assert.ok(fix.label.length > 0, name + " has no label")
@@ -463,8 +476,18 @@ test("every demo state renders as bin/demo-states advertises it", () => {
   const tool = path.join(__dirname, "..", "bin", "demo-states")
 
   const expected = {
-    ok: "ok", quiet: "ok", offline: "offline", blocked: "blocked",
+    ok: "ok", "no-mail": "ok", quiet: "ok", offline: "offline", blocked: "blocked",
     stopped: "stopped", signin: "signin", unsupported: "unsupported",
+    unreadable: "unreadable",
+  }
+
+  // --list is the tool's own inventory. A state added there and forgotten here
+  // is a state nobody walks, which is the failure the tool exists to prevent.
+  const listed = execFileSync(tool, ["--list"], { encoding: "utf8" })
+    .split("\n").map((line) => line.trim().split(/\s+/)[0]).filter(Boolean)
+  assert.ok(listed.length > 0, "bin/demo-states --list said nothing")
+  for (const name of listed) {
+    assert.ok(name in expected, `bin/demo-states lists "${name}" and nothing here checks it`)
   }
 
   for (const [name, wanted] of Object.entries(expected)) {
