@@ -39,6 +39,11 @@ Item {
 
   readonly property var routed: Capture.route(field.text)
   readonly property bool streaming: answer.text !== "" || asking
+  // A Process that is already running ignores a new command and ignores
+  // running = true, so a second enter did nothing — except, on a route that
+  // streams, blank the pane it had just filled. One in flight at a time, and
+  // the line under the field says which.
+  readonly property bool busy: asking || runProcess.running
 
   function open(payloadJson) {
     errorText = ""
@@ -71,7 +76,7 @@ Item {
 
   function submit() {
     var action = root.routed
-    if (!action) return
+    if (!action || root.busy) return
 
     if (Capture.streams(action)) {
       answer.text = ""
@@ -179,7 +184,11 @@ Item {
           Keys.onEscapePressed: root.dismiss()
           onAccepted: root.submit()
           Keys.onPressed: function(event) {
-            if (event.key === Qt.Key_C && (event.modifiers & Qt.ControlModifier)) {
+            // ctrl+c is the field's until something is streaming into the pane
+            // below it. Taking it unconditionally meant you could not copy what
+            // you had typed out of a field whose whole job is what you typed.
+            if (event.key === Qt.Key_C && (event.modifiers & Qt.ControlModifier)
+                && root.asking) {
               root.stopAsking()
               event.accepted = true
             }
@@ -225,7 +234,9 @@ Item {
 
         Text {
           width: parent.width
-          text: root.asking ? "… ctrl+c stops · esc closes" : "enter sends · esc closes"
+          text: root.asking ? "… ctrl+c stops · esc closes"
+            : runProcess.running ? "sending…"
+            : "enter sends · esc closes"
           color: Qt.darker(Color.menu.text, 1.55)
           font.family: Style.font.menuFamily
           font.pixelSize: Style.font.caption

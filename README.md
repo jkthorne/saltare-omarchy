@@ -132,9 +132,11 @@ documents and uploads, so the field that captures a thought also finds one.
 No sigil means ask. That is deliberate: the common case for a field you
 summoned with a keystroke is a thought, and making the common case the one
 with no sigil is what makes the sigils worth learning. `enter` sends, `esc`
-closes and keeps nothing, `ctrl+c` stops an answer mid-stream. A command that
-fails leaves your text in the field — losing what someone typed is the one
-unforgivable failure for a capture field.
+closes and keeps nothing, and `ctrl+c` stops an answer mid-stream — the rest
+of the time it copies, because a field whose whole job is what you typed has
+no business taking the key that copies it. A command that fails leaves your
+text in the field — losing what someone typed is the one unforgivable failure
+for a capture field.
 
 ## Keys
 

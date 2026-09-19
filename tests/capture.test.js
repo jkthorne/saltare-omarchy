@@ -135,6 +135,23 @@ test("the overlay answers the shell's summon contract", () => {
   assert.match(source, /WlrKeyboardFocus\.Exclusive/)
 })
 
+test("ctrl+c stops a stream, and the rest of the time it copies", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "Capture.qml"), "utf8")
+  // Accepting it unconditionally meant the one key that copies never reached
+  // a field whose whole job is what you typed into it.
+  assert.match(source, /Qt\.Key_C[\s\S]{0,200}root\.asking/)
+})
+
+test("one command in flight at a time, and the line under the field says which", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "Capture.qml"), "utf8")
+  // A running Process ignores a new command and ignores running = true, so a
+  // second enter was silently nothing — and on a streaming route it blanked
+  // the pane first.
+  assert.match(source, /if \(!action \|\| root\.busy\) return/)
+  assert.match(source, /busy:\s*asking \|\| runProcess\.running/)
+  assert.match(source, /"sending…"/)
+})
+
 test("the overlay releases the summon it was given, and has to name itself to", () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "Capture.qml"), "utf8")
   // The shell's scoped API refuses a target the plugin does not own, and ""
