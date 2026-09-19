@@ -135,6 +135,23 @@ test("the overlay answers the shell's summon contract", () => {
   assert.match(source, /WlrKeyboardFocus\.Exclusive/)
 })
 
+test("the overlay releases the summon it was given, and has to name itself to", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "Capture.qml"), "utf8")
+  // The shell's scoped API refuses a target the plugin does not own, and ""
+  // is owned by nobody. hide() with no argument returned false, so the window
+  // went and the host went on believing the plugin was open.
+  assert.match(source, /shell\.hide\(root\.pluginId\)/)
+  assert.match(source, /pluginId:[^\n]*manifest\.id/)
+})
+
+test("a field summoned by a keystroke is not rebuilt on every keystroke", () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "manifest.json"), "utf8"))
+  // Without this the host drops the Loader on hide and recompiles the overlay
+  // asynchronously on the next summon. Every keystroke-summoned overlay the
+  // shell ships — emojis, clipboard, menu — sets it.
+  assert.equal(manifest.keepLoaded, true)
+})
+
 test("the overlay is declared in the manifest, or nothing can summon it", () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "manifest.json"), "utf8"))
   assert.ok(manifest.kinds.includes("overlay"))

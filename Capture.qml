@@ -25,6 +25,10 @@ Item {
   property var manifest: null
   property bool opened: false
 
+  // Every call on the shell names the plugin it acts on, and the scoped API
+  // hands back false for a target we do not own. "" is owned by nobody.
+  readonly property string pluginId: (manifest && manifest.id) || "saltare.workspace"
+
   property bool asking: false
   property string errorText: ""
 
@@ -55,9 +59,14 @@ Item {
     streamNotice = ""
   }
 
+  // close() is ours — it empties the field and drops the window. dismiss() also
+  // tells the host, which is what releases the summon. Calling hide() with no
+  // argument looked like it worked, because the window goes either way; what
+  // it actually did was leave the plugin marked open in the shell for the rest
+  // of the session.
   function dismiss() {
     close()
-    if (root.shell && typeof root.shell.hide === "function") root.shell.hide()
+    if (root.shell && typeof root.shell.hide === "function") root.shell.hide(root.pluginId)
   }
 
   function submit() {

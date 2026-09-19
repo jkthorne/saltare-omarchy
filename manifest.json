@@ -10,6 +10,7 @@
     "bar-widget",
     "overlay"
   ],
+  "keepLoaded": true,
   "entryPoints": {
     "barWidget": "Panel.qml",
     "overlay": "Capture.qml"
