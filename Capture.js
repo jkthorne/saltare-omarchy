@@ -72,13 +72,12 @@ function route(input) {
   if (text.charAt(0) === "!") {
     var body = text.slice(1).trim()
     var due = ""
+    // One test covers both spellings. `!2026-09-20 x` and `! 2026-09-20 x`
+    // differ only in where the bang ends, and the bang is gone by here.
     var maybeDate = firstWord(body)
     if (ISO_DATE.test(maybeDate)) {
       due = maybeDate
       body = body.slice(maybeDate.length).trim()
-    } else if (ISO_DATE.test(head.slice(1))) {
-      due = head.slice(1)
-      body = rest
     }
     if (body === "") return null
     var command = "sal tasks add " + quote(body)
