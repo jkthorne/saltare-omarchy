@@ -37,18 +37,31 @@ Item {
   // would be the overlay calling a search that worked a failure.
   property string streamNotice: ""
 
+  property bool searching: false
+  property string searchBuffer: ""
+
+  // The rows a search became, and where the cursor is in them. Selection lives
+  // here rather than on the view, the way every host overlay keeps it, because
+  // the list is rebuilt wholesale on each search and a view's own currentIndex
+  // would not survive that.
+  property var rows: []
+  property int selectedIndex: 0
+  property bool cursorActive: false
+
   readonly property var routed: Capture.route(field.text)
   readonly property bool streaming: answer.text !== "" || asking
+  readonly property bool listing: rows.length > 0
   // A Process that is already running ignores a new command and ignores
   // running = true, so a second enter did nothing — except, on a route that
   // streams, blank the pane it had just filled. One in flight at a time, and
   // the line under the field says which.
-  readonly property bool busy: asking || runProcess.running
+  readonly property bool busy: asking || searching || runProcess.running
 
   function open(payloadJson) {
     errorText = ""
     streamNotice = ""
     answer.text = ""
+    clearRows()
     opened = true
     Qt.callLater(function() { field.forceActiveFocus() })
   }
@@ -62,6 +75,14 @@ Item {
     answer.text = ""
     errorText = ""
     streamNotice = ""
+    clearRows()
+  }
+
+  function clearRows() {
+    rows = []
+    selectedIndex = 0
+    cursorActive = false
+    searchBuffer = ""
   }
 
   // close() is ours — it empties the field and drops the window. dismiss() also
@@ -74,11 +95,50 @@ Item {
     if (root.shell && typeof root.shell.hide === "function") root.shell.hide(root.pluginId)
   }
 
+  // Enter means two things now, and which one it means is whether a row is
+  // selected. With a cursor it opens that row; without one it is the send or
+  // the search it has always been.
+  function activate() {
+    if (cursorActive && rows.length > 0) {
+      var row = rows[Math.max(0, Math.min(selectedIndex, rows.length - 1))]
+      if (!row || !row.command) return
+      // Dismiss before spawning, the way every host overlay does: the layer
+      // surface holds an exclusive keyboard grab, and the browser about to
+      // open wants it.
+      dismiss()
+      launcher.exec(["sh", "-c", row.command])
+      return
+    }
+    submit()
+  }
+
+  function moveSelection(delta) {
+    if (rows.length === 0) return
+    if (!cursorActive) {
+      cursorActive = true
+      selectedIndex = delta > 0 ? 0 : rows.length - 1
+    } else {
+      selectedIndex = (selectedIndex + delta + rows.length) % rows.length
+    }
+    resultList.positionViewAtIndex(selectedIndex, ListView.Contain)
+  }
+
   function submit() {
     var action = root.routed
     if (!action || root.busy) return
 
+    if (Capture.finds(action)) {
+      clearRows()
+      errorText = ""
+      streamNotice = ""
+      searching = true
+      searchProcess.command = ["sh", "-c", action.command]
+      searchProcess.running = true
+      return
+    }
+
     if (Capture.streams(action)) {
+      clearRows()
       answer.text = ""
       errorText = ""
       streamNotice = ""
@@ -113,6 +173,35 @@ Item {
       // the one unforgivable failure for a capture field.
       if (exitCode === 0) root.dismiss()
       else if (root.errorText === "") root.errorText = "sal exited " + exitCode
+    }
+  }
+
+  // Opening a row is fire-and-forget: the overlay is already gone by the time
+  // this runs, so there is nothing left to report an exit code to.
+  Process { id: launcher }
+
+  // A search arrives as one JSON document rather than a line at a time, so it
+  // is collected and parsed at exit. The streaming pane below is for prose.
+  Process {
+    id: searchProcess
+    running: false
+    stdout: SplitParser { onRead: function(line) { root.searchBuffer += String(line) + "\n" } }
+    stderr: SplitParser { onRead: function(line) { root.streamNotice = String(line).trim() } }
+    onExited: function(exitCode) {
+      root.searching = false
+      if (exitCode === 0) {
+        root.rows = Capture.rows(root.searchBuffer)
+        // `sal search` prints "no results" on stderr and exits 0, which is a
+        // result and not a failure — the same reason the ask pane holds its
+        // stderr until the exit code says what it was.
+        if (root.rows.length === 0 && root.streamNotice === "") root.streamNotice = "no results"
+      } else {
+        root.errorText = root.streamNotice !== "" ? root.streamNotice : "sal exited " + exitCode
+        root.streamNotice = ""
+      }
+      root.searchBuffer = ""
+      root.selectedIndex = 0
+      root.cursorActive = false
     }
   }
 
@@ -182,7 +271,11 @@ Item {
           background: Rectangle { color: "transparent" }
 
           Keys.onEscapePressed: root.dismiss()
-          onAccepted: root.submit()
+          onAccepted: root.activate()
+          // The field keeps focus and drives the list from here, which is the
+          // weather panel's idiom. The other one the shell uses — a bare
+          // key-catcher with Keys.priority: Keys.BeforeItem over the whole
+          // card — would eat every keystroke meant for this field.
           Keys.onPressed: function(event) {
             // ctrl+c is the field's until something is streaming into the pane
             // below it. Taking it unconditionally meant you could not copy what
@@ -190,6 +283,12 @@ Item {
             if (event.key === Qt.Key_C && (event.modifiers & Qt.ControlModifier)
                 && root.asking) {
               root.stopAsking()
+              event.accepted = true
+            } else if (event.key === Qt.Key_Down && root.listing) {
+              root.moveSelection(1)
+              event.accepted = true
+            } else if (event.key === Qt.Key_Up && root.listing) {
+              root.moveSelection(-1)
               event.accepted = true
             }
           }
@@ -218,7 +317,79 @@ Item {
 
         PanelSeparator {
           width: parent.width
-          visible: root.streaming
+          visible: root.streaming || root.listing
+        }
+
+        // A search becomes rows, and every row knows the command its enter key
+        // runs — the invariant the bar widget's popup has always held. Before
+        // this the results were one Text, which nothing could select, click or
+        // reach with a key.
+        ListView {
+          id: resultList
+          width: parent.width
+          height: Math.min(contentHeight, Style.space(320))
+          visible: root.listing
+          model: root.rows
+          clip: true
+          interactive: contentHeight > height
+          boundsBehavior: Flickable.StopAtBounds
+          // The field owns the keyboard; the view must not fight it for the
+          // arrow keys it is already handling.
+          keyNavigationEnabled: false
+
+          delegate: Rectangle {
+            required property var modelData
+            required property int index
+
+            width: ListView.view.width
+            implicitHeight: rowText.implicitHeight + Style.space(8)
+            radius: Style.space(4)
+            // Selection is read off the root, not the view: the model is
+            // replaced wholesale on every search.
+            readonly property bool hasCursor: root.cursorActive && index === root.selectedIndex
+            color: hasCursor ? Style.selectedFillFor(Color.menu.text, Color.accent) : "transparent"
+
+            Row {
+              id: rowText
+              anchors.verticalCenter: parent.verticalCenter
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.leftMargin: Style.space(6)
+              anchors.rightMargin: Style.space(6)
+              spacing: Style.space(8)
+
+              Text {
+                width: Style.space(52)
+                text: modelData.kind
+                color: Color.accent
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+              Text {
+                width: parent.width - Style.space(52) - sub.width - parent.spacing * 2
+                elide: Text.ElideRight
+                text: modelData.label
+                color: Color.menu.text
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.body
+              }
+              Text {
+                id: sub
+                text: modelData.sub || ""
+                elide: Text.ElideLeft
+                color: Qt.darker(Color.menu.text, 1.55)
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              hoverEnabled: true
+              onEntered: { root.cursorActive = true; root.selectedIndex = index }
+              onClicked: { root.selectedIndex = index; root.cursorActive = true; root.activate() }
+            }
+          }
         }
 
         Text {
@@ -232,10 +403,24 @@ Item {
           font.pixelSize: Style.font.body
         }
 
+        // A search that found nothing said so on stderr and exited 0, which is
+        // a result. It gets a line rather than the red the error pane paints.
+        Text {
+          width: parent.width
+          visible: root.streamNotice !== "" && !root.listing && !root.streaming
+          text: root.streamNotice
+          wrapMode: Text.WordWrap
+          color: Qt.darker(Color.menu.text, 1.55)
+          font.family: Style.font.menuFamily
+          font.pixelSize: Style.font.bodySmall
+        }
+
         Text {
           width: parent.width
           text: root.asking ? "… ctrl+c stops · esc closes"
+            : root.searching ? "searching…"
             : runProcess.running ? "sending…"
+            : root.listing ? "↑↓ move · enter opens · esc closes"
             : "enter sends · esc closes"
           color: Qt.darker(Color.menu.text, 1.55)
           font.family: Style.font.menuFamily

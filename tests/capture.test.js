@@ -56,12 +56,21 @@ test("?query searches every pull surface at once", () => {
   const routed = Capture.route("?the receipt from March")
   assert.equal(routed.kind, "search")
   assert.equal(routed.target, "the receipt from March")
-  assert.equal(routed.command, "sal search 'the receipt from March'")
+  // --json leads the query: parseTrailing in the CLI refuses a trailing
+  // valueless flag, because it would be swallowed as a word of the query.
+  assert.equal(routed.command, "sal search --json 'the receipt from March'")
   assert.equal(routed.summary, "Search for the receipt from March")
 })
 
-test("a search answers in the overlay, because the results are the point", () => {
-  assert.equal(Capture.streams(Capture.route("?deploy")), true)
+test("both questions answer in the overlay; they no longer answer the same way", () => {
+  // An answer is prose and arrives a line at a time, so it streams into a
+  // pane. A search is a list of things you might open, so it arrives whole and
+  // becomes rows. Calling both "streams" was true of the plumbing and false of
+  // the product — it is what left the results unreachable for a keyboard.
+  assert.equal(Capture.streams(Capture.route("?deploy")), false)
+  assert.equal(Capture.finds(Capture.route("?deploy")), true)
+  assert.equal(Capture.streams(Capture.route("why")), true)
+  assert.equal(Capture.finds(Capture.route("why")), false)
 })
 
 test("anything without a sigil is a question, because that is the common case", () => {
@@ -71,10 +80,77 @@ test("anything without a sigil is a question, because that is the common case", 
   assert.equal(Capture.streams(routed), true)
 })
 
-test("only the two questions stream back; every send gets out of the way", () => {
+test("every send gets out of the way — nothing to stream and nothing to list", () => {
   for (const input of ["#general hi", "@scout hi", "!a thing", "/doc a doc"]) {
     assert.equal(Capture.streams(Capture.route(input)), false, input)
+    assert.equal(Capture.finds(Capture.route(input)), false, input)
   }
+})
+
+// ── the rows a search becomes ───────────────────────────────────────────
+
+const searchJSON = JSON.stringify({
+  messages: [{ id: 7, body: "the zeppelin\ndeploy finished", channel: { slug: "general" } }],
+  tasks: [{ slug: "fix-deploy", title: "Fix the deploy", state: "open" }],
+  documents: [
+    { slug: "notes", title: "Notes", path: "airship-logs/notes" },
+    { slug: "daily", title: "Daily" },
+  ],
+  uploads: [{ slug: "plan", title: "plan.pdf" }],
+  people: [{ id: 351812532, name: "Alice Chen", title: "Staff Eng", email: "a@x.com" }],
+})
+
+test("every row knows the command its enter key runs", () => {
+  // The invariant the bar widget's popup has always held, and the one this
+  // surface did not: it rendered results as a block of text nothing could
+  // select, click or reach with a key.
+  const rows = Capture.rows(searchJSON)
+  assert.equal(rows.length, 6)
+  for (const row of rows) {
+    assert.ok(row.command !== "", JSON.stringify(row))
+    assert.ok(row.label !== "", JSON.stringify(row))
+  }
+  assert.deepEqual(rows.map((r) => r.kind), ["msg", "task", "doc", "doc", "file", "person"])
+})
+
+test("a document opens at its tree address, or at its own editor when it has none", () => {
+  // Everything /doc has ever created has no node, so the fallback is the
+  // common case rather than the exception.
+  const [withPath, withoutPath] = Capture.rows(searchJSON).filter((r) => r.kind === "doc")
+  assert.equal(withPath.command, "sal open data 'airship-logs/notes'")
+  assert.equal(withoutPath.command, "sal open document 'daily'")
+})
+
+test("a person is opened by membership id, and a message by its channel and id", () => {
+  const rows = Capture.rows(searchJSON)
+  assert.equal(rows.find((r) => r.kind === "person").command, "sal open member 351812532")
+  assert.equal(rows.find((r) => r.kind === "msg").command, "sal open message 'general' 7")
+})
+
+test("a body with a newline in it is still one row", () => {
+  assert.equal(Capture.rows(searchJSON)[0].label, "the zeppelin deploy finished")
+})
+
+test("a hit with nothing to open is not drawn at all", () => {
+  // Better an absent row than one that looks like every other row and does
+  // nothing when you press enter.
+  const rows = Capture.rows(JSON.stringify({
+    tasks: [{ title: "No slug, no URL" }, { slug: "ok", title: "Fine" }],
+  }))
+  assert.deepEqual(rows.map((r) => r.label), ["Fine"])
+})
+
+test("output that is not a search result is no rows, not an exception", () => {
+  for (const junk of ["", "   ", "no results", "{", "null", "[1,2]", undefined]) {
+    assert.deepEqual(Capture.rows(junk), [], JSON.stringify(junk))
+  }
+})
+
+test("everything a row runs was quoted by the same function every send uses", () => {
+  const rows = Capture.rows(JSON.stringify({
+    documents: [{ slug: "it's; rm -rf ~", title: "Hostile" }],
+  }))
+  assert.equal(rows[0].command, "sal open document 'it'\\''s; rm -rf ~'")
 })
 
 test("a sigil with nothing after it is not an action", () => {
@@ -151,8 +227,37 @@ test("one command in flight at a time, and the line under the field says which",
   // second enter was silently nothing — and on a streaming route it blanked
   // the pane first.
   assert.match(source, /if \(!action \|\| root\.busy\) return/)
-  assert.match(source, /busy:\s*asking \|\| runProcess\.running/)
+  // Every process the overlay can have in flight counts, or the guard only
+  // covers the ones it happened to know about when it was written.
+  const busy = source.match(/readonly property bool busy:[^\n]*/)[0]
+  for (const inFlight of ["asking", "searching", "runProcess.running"]) {
+    assert.ok(busy.includes(inFlight), inFlight + " is not in: " + busy)
+  }
   assert.match(source, /"sending…"/)
+  assert.match(source, /"searching…"/)
+})
+
+test("the results are rows a keyboard can reach, not a pane it cannot", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "Capture.qml"), "utf8")
+  assert.match(source, /ListView \{/)
+  assert.match(source, /model: root\.rows/)
+  // Selection on the root, not the view: the model is replaced wholesale on
+  // every search and a view's own currentIndex would not survive it.
+  assert.match(source, /hasCursor: root\.cursorActive && index === root\.selectedIndex/)
+  // The field owns the keyboard and hands the arrows down; the view must not
+  // fight it for them.
+  assert.match(source, /keyNavigationEnabled: false/)
+  assert.match(source, /Qt\.Key_Down/)
+  assert.match(source, /Qt\.Key_Up/)
+})
+
+test("a row's command is spawned after the overlay has let go of the keyboard", () => {
+  // The layer surface holds an exclusive grab; the browser about to open wants
+  // it. Every host overlay dismisses first for this reason.
+  const source = fs.readFileSync(path.join(__dirname, "..", "Capture.qml"), "utf8")
+  const activate = source.match(/function activate\(\)[\s\S]*?\n  \}/)[0]
+  assert.ok(activate.indexOf("dismiss()") < activate.indexOf("launcher.exec"),
+    "activate() spawns before it dismisses:\n" + activate)
 })
 
 test("the overlay releases the summon it was given, and has to name itself to", () => {

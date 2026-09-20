@@ -139,9 +139,18 @@ tells you where before you commit:
 `?` is the only sigil that pulls rather than pushes, and it is why there is no
 second widget for notes, files or photos: one search spans messages, tasks,
 documents, uploads and the people in the workspace, so the field that captures
-a thought also finds one — or finds whose desk to put it on. `?chen` answers
-with a colleague's title, email and phone, which needs a `sal` new enough to
-ask `/members`; an older one simply returns the other four kinds.
+a thought also finds one — or finds whose desk to put it on.
+
+**The results are rows, and every row opens.** `↑`/`↓` move, `enter` opens the
+selected one in the browser, `esc` closes. A message goes to its place in its
+channel, a task to the task, a person to their directory entry, and a document
+or file to its address in the data tree — or, for anything made through the
+API, to its own editor, since nothing `/doc` creates has a tree address. A hit
+with nothing to open is not drawn at all.
+
+This needs a `sal` new enough to answer `sal search --json` and to know the
+`member`, `data`, `document` and `upload` kinds of `sal open`. An older one
+returns no rows.
 
 No sigil means ask. That is deliberate: the common case for a field you
 summoned with a keystroke is a thought, and making the common case the one

@@ -110,7 +110,10 @@ function route(input) {
       kind: "search",
       summary: "Search for " + query,
       target: query,
-      command: "sal search " + quote(query)
+      // --json before the query, not after: parseTrailing refuses a trailing
+      // valueless flag, because it would otherwise be swallowed as a word of
+      // the query.
+      command: "sal search --json " + quote(query)
     }
   }
 
@@ -126,12 +129,119 @@ function route(input) {
   }
 }
 
-// streams reports whether the action answers in the overlay rather than
-// finishing silently. Asking and searching do — both are questions, and the
-// answer is the point. Everything else lands in the workspace and the
-// overlay's job is to get out of the way.
+// Both questions answer in the overlay; they no longer answer the same way.
+// An answer is prose and arrives a line at a time, so it streams into a pane.
+// A search is a list of things you might now want to open, so it arrives whole
+// and becomes rows. Saying "streams" of both was true of the plumbing and
+// false of the product: it is what left the results unreachable.
 function streams(routed) {
-  return !!routed && (routed.kind === "ask" || routed.kind === "search")
+  return !!routed && routed.kind === "ask"
+}
+
+function finds(routed) {
+  return !!routed && routed.kind === "search"
+}
+
+// rows turns `sal search --json` into the flat list the overlay draws, one
+// entry per hit, each carrying the command its enter key runs — the invariant
+// the bar widget's popup has always held and this surface never did.
+//
+// The kind tags are the ones `sal search` prints in a terminal, so the two
+// readings of the same search name things the same way.
+function rows(jsonText) {
+  var doc = parseResults(jsonText)
+  if (!doc) return []
+  var out = []
+
+  each(doc.messages, function (hit) {
+    var channel = hit.channel || {}
+    out.push({
+      kind: "msg",
+      label: oneLine(hit.body),
+      sub: channel.slug ? "#" + channel.slug : "",
+      command: channel.slug && hit.id
+        ? "sal open message " + quote(channel.slug) + " " + String(hit.id)
+        : ""
+    })
+  })
+
+  each(doc.tasks, function (hit) {
+    out.push({
+      kind: "task",
+      label: oneLine(hit.title),
+      sub: hit.state || "",
+      command: hit.slug ? "sal open task " + quote(hit.slug) : ""
+    })
+  })
+
+  // A document or upload is opened at its address in the data tree when it has
+  // one. Everything made through the API has none — which is everything `/doc`
+  // has ever created — so the fallback is the leaf's own editor, and it is the
+  // common case rather than the exception.
+  each(doc.documents, function (hit) {
+    out.push({
+      kind: "doc",
+      label: oneLine(hit.title),
+      sub: hit.path || hit.slug || "",
+      command: leafCommand("document", hit)
+    })
+  })
+
+  each(doc.uploads, function (hit) {
+    out.push({
+      kind: "file",
+      label: oneLine(hit.title),
+      sub: hit.path || hit.slug || "",
+      command: leafCommand("upload", hit)
+    })
+  })
+
+  each(doc.people, function (hit) {
+    out.push({
+      kind: "person",
+      label: oneLine(hit.name),
+      sub: oneLine(hit.title) || hit.email || "",
+      // A membership id, never the user id beside it.
+      command: hit.id ? "sal open member " + String(hit.id) : ""
+    })
+  })
+
+  // A hit with nothing to open is not drawn. The alternative is a row that
+  // looks like every other row and does nothing when you press enter, which
+  // is the thing this whole list exists to stop being.
+  return out.filter(function (row) { return row.command !== "" })
+}
+
+function leafCommand(kind, hit) {
+  if (hit.path) return "sal open data " + quote(hit.path)
+  if (hit.slug) return "sal open " + kind + " " + quote(hit.slug)
+  return ""
+}
+
+function parseResults(jsonText) {
+  var text = String(jsonText || "").trim()
+  if (text === "") return null
+  try {
+    var doc = JSON.parse(text)
+    return (doc && typeof doc === "object") ? doc : null
+  } catch (e) {
+    // A search that printed something unparseable is a search with no rows,
+    // not an exception thrown inside a shell.
+    return null
+  }
+}
+
+function each(value, fn) {
+  if (!Array.isArray(value)) return
+  for (var i = 0; i < value.length; i++) {
+    if (value[i] && typeof value[i] === "object") fn(value[i])
+  }
+}
+
+// A hit's body can carry newlines; a row is one line.
+function oneLine(value) {
+  return String(value === undefined || value === null ? "" : value)
+    .replace(/\s+/g, " ").trim()
 }
 
 // hint is what the field shows before anything is typed. It teaches the
@@ -146,5 +256,5 @@ function firstWord(text) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { route: route, streams: streams, hint: hint }
+  module.exports = { route: route, streams: streams, finds: finds, rows: rows, hint: hint }
 }
