@@ -93,9 +93,16 @@ function route(input) {
 
   // ?query — find it. The one sigil that pulls rather than pushes, and the
   // reason there is no bar widget for notes, files or photos: `sal search`
-  // already spans messages, tasks, documents and uploads, which is every
-  // Tier 2 domain the phone gives its own app. The results land in the same
-  // pane an answer does, so the field that captures a thought also finds one.
+  // spans messages, tasks, documents, uploads and the workspace directory in
+  // one call, which is every Tier 2 domain the phone gives its own app. The
+  // results land in the same pane an answer does, so the field that captures a
+  // thought also finds one.
+  //
+  // The directory was the exception, and this comment asserted otherwise for a
+  // while. /api/v1/search carries four types and never carried people, so
+  // rubrica had no route from this desktop at all — not here, not in the bar,
+  // not in `sal`. The CLI merges /members in now, which is what makes the
+  // sentence above true rather than aspirational.
   if (text.charAt(0) === "?") {
     var query = text.slice(1).trim()
     if (query === "") return null

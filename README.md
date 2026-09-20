@@ -133,11 +133,15 @@ tells you where before you commit:
 | `!2026-09-20 ship the plugin` | a task, due then |
 | `/doc Q3 notes` | a new document |
 | `?march receipt` | a search, answered in place |
+| `?chen` | the same search — people included |
 | `what broke last night` | Claude, answered in place |
 
 `?` is the only sigil that pulls rather than pushes, and it is why there is no
 second widget for notes, files or photos: one search spans messages, tasks,
-documents and uploads, so the field that captures a thought also finds one.
+documents, uploads and the people in the workspace, so the field that captures
+a thought also finds one — or finds whose desk to put it on. `?chen` answers
+with a colleague's title, email and phone, which needs a `sal` new enough to
+ask `/members`; an older one simply returns the other four kinds.
 
 No sigil means ask. That is deliberate: the common case for a field you
 summoned with a keystroke is a thought, and making the common case the one

@@ -50,6 +50,9 @@ test("something that only looks like a date stays in the title", () => {
 })
 
 test("?query searches every pull surface at once", () => {
+  // Every one of them, which was not true when this test was named: the
+  // command is unchanged and `sal search` grew the workspace directory, so a
+  // colleague is now findable from the field that had no route to one.
   const routed = Capture.route("?the receipt from March")
   assert.equal(routed.kind, "search")
   assert.equal(routed.target, "the receipt from March")
