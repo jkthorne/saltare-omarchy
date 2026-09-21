@@ -465,6 +465,29 @@ test("x completes a task through the signal the host actually emits", () => {
   assert.match(source, /x complete/)
 })
 
+test("t reaches the client this popup summarises, and focuses it before opening a second", () => {
+  const command = Model.tuiCommand()
+  assert.match(command, /^omarchy-launch-or-focus-tui /)
+  assert.match(command, / sal$/)
+  // Focus matches on the app-id, so the one we ask to focus has to be the one
+  // the window is given. omarchy-launch-tui derives org.omarchy.<basename>
+  // when nothing says otherwise, which is not the one we asked for.
+  assert.ok(command.includes("--app-id=" + Model.TUI_APP_ID))
+  assert.notEqual(Model.TUI_APP_ID, "org.omarchy." + "sal")
+
+  const source = qml("Panel.qml")
+  assert.match(source, /Model\.tuiCommand\(\)/)
+  assert.match(source, /t terminal/)
+
+  // The helper is Omarchy's, not ours, so this is the step that notices when it
+  // is renamed out from under the one string we build by hand. Not a skip: the
+  // assertions above ran, and calling the whole test skipped would hide them.
+  const bin = path.join(process.env.OMARCHY_PATH || "/usr/share/omarchy", "bin")
+  if (!fs.existsSync(bin)) return
+  assert.ok(fs.existsSync(path.join(bin, "omarchy-launch-or-focus-tui")),
+    "Omarchy no longer ships omarchy-launch-or-focus-tui — the t key names a launcher that is gone")
+})
+
 test("the manifest declares what the shell needs and what the settings pane shows", () => {
   const manifest = JSON.parse(qml("manifest.json"))
   assert.equal(manifest.schemaVersion, 1)

@@ -3,6 +3,7 @@ import QtQuick.Controls
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
+import "Model.js" as Model
 
 // The bar button and its popup.
 //
@@ -156,6 +157,7 @@ Panel {
       onTextKey: function(t) {
         if (t === "r" || t === "R") watch.recheck()
         else if (t === "o" || t === "O") { root.run("sal open"); root.close() }
+        else if (t === "t" || t === "T") { root.run(Model.tuiCommand()); root.close() }
       }
 
       Flickable {
@@ -298,7 +300,10 @@ Panel {
 
           Text {
             width: parent.width
-            text: "j/k move · enter open · x complete · r refresh · o workspace"
+            // Wrapped rather than elided: a hint line that clips loses the
+            // last key it names, and the last key it names is the newest one.
+            wrapMode: Text.WordWrap
+            text: "j/k move · enter open · x complete · r refresh · t terminal · o browser"
             color: root.dim
             font.family: root.fontFamily
             font.pixelSize: Style.font.bodySmall

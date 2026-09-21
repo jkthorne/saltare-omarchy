@@ -21,7 +21,7 @@ should go.
 │ WORK                                │
 │   Fix the deploy         2026-09-14 │
 │   Ship the Omarchy plugin    today  │
-│ j/k move · enter open · x complete  │
+│ j/k move · enter open · t terminal  │
 └─────────────────────────────────────┘
 ```
 
@@ -164,8 +164,19 @@ for a capture field.
 ## Keys
 
 `j`/`k` move · `enter` opens the row · `x` completes the selected task ·
-`r` re-reads the file and re-checks for `sal` · `o` opens the workspace in a
-browser. Right-click the bar icon to re-check without opening the panel.
+`r` re-reads the file and re-checks for `sal` · `t` opens the TUI ·
+`o` opens the workspace in a browser. Right-click the bar icon to re-check
+without opening the panel.
+
+`t` runs `omarchy-launch-or-focus-tui`, which **focuses a `sal` window that is
+already open** before it considers opening a second one — so pressing it on
+every glance leaves you with one terminal rather than a stack of them signed
+into the same workspace. The window gets the app-id `org.saltare.sal`, which is
+what that focus matches on and what a Hyprland window rule should name.
+
+This popup is a summary; `sal` is a client. Everything the summary cannot hold
+— the feed, threads, documents, the assistant — is one key away rather than
+something this widget has to grow into.
 
 ## Settings
 

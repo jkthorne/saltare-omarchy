@@ -10,6 +10,12 @@
 
 var SCHEMA = 1
 
+// The app-id the `sal` window gets when this widget launches it. Ours rather
+// than omarchy-launch-tui's default org.omarchy.sal: the window belongs to
+// Saltare, and a window rule someone writes for it should not have to claim a
+// name in the desktop's own namespace to match it.
+var TUI_APP_ID = "org.saltare.sal"
+
 // ── the snapshot ────────────────────────────────────────────────────────
 //
 // A snapshot is what the file said, or why it didn't say anything.
@@ -411,6 +417,18 @@ function completeCommand(slug) {
   return "sal tasks complete " + shellQuote(String(slug))
 }
 
+// tuiCommand opens `sal` itself. This popup is a summary of a workspace; the
+// TUI is a client for one, and everything the summary cannot hold — a feed, a
+// thread, a document, the assistant — is already in there. A bar widget that
+// can reach it is worth more than a bar widget that grows into it.
+//
+// launch-or-focus rather than launch: it focuses a window that exists before it
+// opens a second one, so pressing this on every glance leaves one terminal
+// rather than a stack of them signed into the same workspace.
+function tuiCommand() {
+  return "omarchy-launch-or-focus-tui --app-id=" + TUI_APP_ID + " sal"
+}
+
 // shellQuote exists because these strings come off the wire. A channel slug is
 // tame, but "tame in practice" is how a command injection gets written.
 function shellQuote(value) {
@@ -459,6 +477,8 @@ if (typeof module !== "undefined") {
     fixFor: fixFor,
     openCommand: openCommand,
     completeCommand: completeCommand,
+    tuiCommand: tuiCommand,
+    TUI_APP_ID: TUI_APP_ID,
     shellQuote: shellQuote,
     list: list
   }
