@@ -63,6 +63,20 @@ Panel {
     root.close()
   }
 
+  // `t` insists on the terminal whatever `sal`'s open_target is set to. A key
+  // whose whole job is to be the other door has to be the other door every
+  // time; one that sometimes opened a browser would not be one.
+  //
+  // With no row under the cursor there is nowhere to go, so it is the client
+  // itself — which is also what `t` meant before rows had a second door.
+  function openInTerminal() {
+    clampCursor()
+    if (cursorActive && rows.length > 0 && rows[cursor].terminal)
+      run(rows[cursor].terminal)
+    else
+      run(Model.tuiCommand())
+  }
+
   // `x` on a task completes it. The row strikes itself immediately and the
   // next published document is the confirmation — optimism is right here
   // because the file is about to tell the truth either way.
@@ -157,7 +171,7 @@ Panel {
       onTextKey: function(t) {
         if (t === "r" || t === "R") watch.recheck()
         else if (t === "o" || t === "O") { root.run("sal open"); root.close() }
-        else if (t === "t" || t === "T") { root.run(Model.tuiCommand()); root.close() }
+        else if (t === "t" || t === "T") { root.openInTerminal(); root.close() }
       }
 
       Flickable {

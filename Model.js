@@ -369,9 +369,8 @@ function rows(v) {
       section: i === 0 ? "MENTIONS" : "",
       label: notificationLine(note),
       sub: note.preview || note.task_title || "",
-      command: note.channel_slug
-        ? openCommand("channel", note.channel_slug)
-        : openCommand("task", note.task_slug)
+      command: openCommand(noteKind(note), noteSlug(note)),
+      terminal: openCommand(noteKind(note), noteSlug(note), true)
     })
   }
   for (i = 0; i < v.channels.length; i++) {
@@ -382,7 +381,8 @@ function rows(v) {
       label: channel.label,
       sub: String(channel.unread),
       urgent: channel.mentioned,
-      command: openCommand("channel", channel.slug)
+      command: openCommand("channel", channel.slug),
+      terminal: openCommand("channel", channel.slug, true)
     })
   }
   var work = v.work.overdue.concat(v.work.today)
@@ -395,6 +395,7 @@ function rows(v) {
       sub: task.due_date,
       urgent: i < v.work.overdue.length,
       command: openCommand("task", task.slug),
+      terminal: openCommand("task", task.slug, true),
       complete: completeCommand(task.slug)
     })
   }
@@ -404,12 +405,29 @@ function rows(v) {
   return out
 }
 
-// openCommand is the argv a row's enter key runs. Everything the widget does
-// to the workspace goes through the CLI that holds the session; this file
-// never sees a token and never makes a request.
-function openCommand(kind, slug) {
+// A mention is about a channel when it names one and about a task otherwise —
+// the same two-branch answer twice, so it is written once.
+function noteKind(note) {
+  return note && note.channel_slug ? "channel" : "task"
+}
+
+function noteSlug(note) {
+  if (!note) return ""
+  return note.channel_slug || note.task_slug || ""
+}
+
+// openCommand is the argv a row's keys run. Everything the widget does to the
+// workspace goes through the CLI that holds the session; this file never sees
+// a token and never makes a request.
+//
+// Two doors, and the difference between them is one flag. Bare, it follows
+// `sal`'s own `open_target` — one setting, in the process that holds the
+// session, obeyed by this popup and by a notification's --exec alike. With
+// `--tui` it insists on the terminal, which is what `t` is for: a key that is
+// the other door has to be the other door every time, or it is not one.
+function openCommand(kind, slug, terminal) {
   if (!slug) return ""
-  return "sal open " + kind + " " + shellQuote(String(slug))
+  return "sal open " + (terminal ? "--tui " : "") + kind + " " + shellQuote(String(slug))
 }
 
 function completeCommand(slug) {
@@ -478,6 +496,8 @@ if (typeof module !== "undefined") {
     openCommand: openCommand,
     completeCommand: completeCommand,
     tuiCommand: tuiCommand,
+    noteKind: noteKind,
+    noteSlug: noteSlug,
     TUI_APP_ID: TUI_APP_ID,
     shellQuote: shellQuote,
     list: list

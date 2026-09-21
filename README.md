@@ -142,7 +142,8 @@ documents, uploads and the people in the workspace, so the field that captures
 a thought also finds one — or finds whose desk to put it on.
 
 **The results are rows, and every row opens.** `↑`/`↓` move, `enter` opens the
-selected one in the browser, `esc` closes. A message goes to its place in its
+selected one — in a browser, or in `sal` itself; see [Where a row
+opens](#where-a-row-opens) — and `esc` closes. A message goes to its place in its
 channel, a task to the task, a person to their directory entry, and a document
 or file to its address in the data tree — or, for anything made through the
 API, to its own editor, since nothing `/doc` creates has a tree address. A hit
@@ -163,20 +164,46 @@ for a capture field.
 
 ## Keys
 
-`j`/`k` move · `enter` opens the row · `x` completes the selected task ·
-`r` re-reads the file and re-checks for `sal` · `t` opens the TUI ·
-`o` opens the workspace in a browser. Right-click the bar icon to re-check
-without opening the panel.
-
-`t` runs `omarchy-launch-or-focus-tui`, which **focuses a `sal` window that is
-already open** before it considers opening a second one — so pressing it on
-every glance leaves you with one terminal rather than a stack of them signed
-into the same workspace. The window gets the app-id `org.saltare.sal`, which is
-what that focus matches on and what a Hyprland window rule should name.
+`j`/`k` move · `enter` opens the row · `t` opens it in the terminal ·
+`x` completes the selected task · `r` re-reads the file and re-checks for
+`sal` · `o` opens the workspace in a browser. Right-click the bar icon to
+re-check without opening the panel.
 
 This popup is a summary; `sal` is a client. Everything the summary cannot hold
 — the feed, threads, documents, the assistant — is one key away rather than
 something this widget has to grow into.
+
+## Where a row opens
+
+`enter` runs `sal open`, and **`sal` decides where that lands**:
+
+```json
+// ~/.config/saltare/config.json
+{ "open_target": "tui" }
+```
+
+The setting is there rather than here on purpose. `sal open` is also what a
+notification's click action runs and what a shell script reaches for, so a
+switch in this plugin's settings would move the rows in this popup and leave
+every other caller opening a browser. One answer, in the process that holds the
+session.
+
+**`t` insists on the terminal** whatever that key says — `sal open --tui` on
+the selected row, and with no row under the cursor, `sal` itself. A key whose
+whole job is to be the other door has to be the other door every time.
+
+Either way you end up with **one terminal, not a stack of them**. A running
+`sal` listens on a socket in the runtime directory, so a row that resolves to
+the terminal moves the window you already have open; only when there is none
+does anything get launched. The window it launches gets the app-id
+`org.saltare.sal` — that is what a later focus matches on, what a Hyprland
+window rule should name, and a string this repo and `saltare-cli` have to
+agree on, so the tests here read theirs and check.
+
+**Two kinds always open on the web.** A person and a data-tree node have pages
+there and no screen in `sal`, so they fall back rather than landing you in a
+terminal that cannot draw what you clicked. Everything else — channels, tasks,
+messages, agents, documents, uploads — the TUI can show.
 
 ## Settings
 

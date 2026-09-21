@@ -330,6 +330,29 @@ test("every row knows the command its enter key runs", () => {
   assert.equal(rows[5].complete, "sal tasks complete 'fix-deploy'")
 })
 
+test("every row has a second door, and it always goes to the terminal", () => {
+  const rows = Model.rows(Model.view(loaded(), publishedAt, settings, true))
+  for (const row of rows) {
+    // Bare, enter follows sal's own open_target — one setting, in the process
+    // that holds the session, obeyed by this popup and by a notification's
+    // --exec alike. `t` is the other door and has to be it every time.
+    assert.ok(!row.command.includes("--tui"), row.kind + "'s enter took the terminal away")
+    assert.ok(row.terminal.includes("sal open --tui "), row.kind + " has no terminal door")
+    assert.equal(row.terminal, row.command.replace("sal open ", "sal open --tui "),
+      row.kind + " opens two different things depending on the key")
+  }
+  assert.equal(rows[1].terminal, "sal open --tui channel 'engineering'")
+  assert.equal(rows[5].terminal, "sal open --tui task 'fix-deploy'")
+})
+
+test("a mention about a task is a task row, whichever door it is opened by", () => {
+  assert.equal(Model.noteKind({ channel_slug: "general" }), "channel")
+  assert.equal(Model.noteSlug({ channel_slug: "general" }), "general")
+  assert.equal(Model.noteKind({ task_slug: "fix-deploy" }), "task")
+  assert.equal(Model.noteSlug({ task_slug: "fix-deploy" }), "fix-deploy")
+  assert.equal(Model.noteSlug({}), "")
+})
+
 test("overdue work is marked urgent and today's is not", () => {
   const rows = Model.rows(Model.view(loaded(), publishedAt, settings, true))
   const tasks = rows.filter((r) => r.kind === "task")
@@ -478,6 +501,10 @@ test("t reaches the client this popup summarises, and focuses it before opening 
   const source = qml("Panel.qml")
   assert.match(source, /Model\.tuiCommand\(\)/)
   assert.match(source, /t terminal/)
+  // With a row under the cursor `t` opens that row rather than the dashboard —
+  // a key that landed you on home after you had selected #engineering would be
+  // telling you where it went and not going there.
+  assert.match(source, /rows\[cursor\]\.terminal/)
 
   // The helper is Omarchy's, not ours, so this is the step that notices when it
   // is renamed out from under the one string we build by hand. Not a skip: the
@@ -486,6 +513,19 @@ test("t reaches the client this popup summarises, and focuses it before opening 
   if (!fs.existsSync(bin)) return
   assert.ok(fs.existsSync(path.join(bin, "omarchy-launch-or-focus-tui")),
     "Omarchy no longer ships omarchy-launch-or-focus-tui — the t key names a launcher that is gone")
+})
+
+// The app-id is what a focus matches on, so the string this widget launches a
+// window with has to be the string saltare-cli focuses. Two repos that release
+// separately, one fact — the same bargain tests/fixtures/watch.json makes, and
+// the same reason for checking it here rather than trusting it.
+test("the app-id this widget launches is the one the CLI focuses", (t) => {
+  const source = path.join(__dirname, "..", "..", "saltare-cli", "cmd", "sal", "opentui.go")
+  if (!fs.existsSync(source)) return t.skip("saltare-cli is not checked out beside this repo")
+  const declared = /AppID\s*=\s*"([^"]+)"/.exec(fs.readFileSync(source, "utf8"))
+  assert.ok(declared, "saltare-cli no longer declares an AppID for the sal window")
+  assert.equal(Model.TUI_APP_ID, declared[1],
+    "this widget opens a window saltare-cli will not find again")
 })
 
 test("the manifest declares what the shell needs and what the settings pane shows", () => {
