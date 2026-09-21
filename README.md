@@ -205,6 +205,42 @@ there and no screen in `sal`, so they fall back rather than landing you in a
 terminal that cannot draw what you clicked. Everything else — channels, tasks,
 messages, agents, documents, uploads — the TUI can show.
 
+## The TUI as a drop-down
+
+A bar popup is a summary and a terminal is a client, and Omarchy has a third
+shape between them: a window on a special workspace that slides in over
+whatever you were doing and leaves without disturbing it. It is three lines of
+your own config, and then the rows in this popup land in it.
+
+```lua
+-- ~/.config/hypr/hyprland.lua, at the bottom, where its own comment invites
+-- personal window rules. Anchored, because a rule's class is a regular
+-- expression and an unescaped dot matches anything.
+o.window({ class = "^org\\.saltare\\.sal$" }, { workspace = "special:saltare" })
+
+-- ~/.config/hypr/bindings.lua
+o.bind("SUPER + SHIFT + T", "Saltare terminal", hl.dsp.workspace.toggle_special("saltare"))
+
+-- ~/.config/hypr/autostart.lua — so the first toggle has something to show
+o.exec_on_start("omarchy-launch-tui --app-id=org.saltare.sal sal")
+```
+
+The autostart line is not optional dressing: toggling a special workspace with
+nothing on it shows nothing, and a first press that appears to do nothing is
+how a binding gets deleted.
+
+**With `open_target` set to `tui` this is the whole thing working together.**
+`enter` on `#engineering` hands the target to the `sal` on that workspace and
+focuses it, and focusing a window on a special workspace is what brings the
+workspace in with it — so a row in the bar slides a terminal down already
+showing the channel you picked. Omarchy's defaults set
+`hide_special_on_workspace_change`, so it puts itself away when you move on.
+
+**None of this ships in the plugin, and it cannot.** Window rules, keybindings
+and autostart are user config; a plugin is cloned files and a manifest. That is
+also why the capture binding in the section above is a stanza to copy rather
+than something this repo installs.
+
 ## Settings
 
 Setup → Plugins → Saltare, or by hand in `~/.config/omarchy/shell.json`.
